@@ -1,0 +1,21 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+Language: Cpp
+Standard: c++20
+ColumnLimit: 80
+
+AlignOperands: Align
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+BreakAfterAttributes: Leave
+BreakAfterReturnType: Automatic
+BreakBeforeBinaryOperators: NonAssignment
+BreakTemplateDeclarations: Leave
+FixNamespaceComments: true
+IncludeBlocks: Preserve
+IndentCaseLabels: true
+SpaceBeforeCpp11BracedList: true
+BinPackArguments: false
+BinPackParameters: OnePerLine
+PackConstructorInitializers: CurrentLine
+PointerAlignment: Left
+PenaltyReturnTypeOnItsOwnLine: 1000
