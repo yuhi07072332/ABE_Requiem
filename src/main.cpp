@@ -34,8 +34,8 @@ struct MapData {
     int cols; // 列数(y軸方向の長さ)
 
     /// i行j列のz座標を取得
-    double operator[](int i, int j) { return grid[i * cols + j]; }
-    double at(int i, int j) { return grid[i * cols + j]; }
+    double operator[](int i, int j) { return grid.at(i * cols + j); }
+    double at(int i, int j) { return grid.at(i * cols + j); }
 
     /// i行j列の点が欠損点かどうかを判定
     bool is_missing(int i, int j) { return std::isnan(at(i, j)); }
