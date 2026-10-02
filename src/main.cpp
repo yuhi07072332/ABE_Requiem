@@ -59,8 +59,6 @@ struct Ground {
 // │                      アルゴリズム                       │
 // └                                                         ┘
 
-
-
 // ┌                                                         ┐
 // │                       データ入力                        │
 // └                                                         ┘
@@ -114,15 +112,15 @@ MapData read_map(const char* data_path) {
     const int rows = max_y - min_y + 1;
     const int cols = max_x - min_x + 1;
 
-    std::vector<double> grid(rows * cols, std::numeric_limits<double>::quiet_NaN());
+    std::vector<double> grid(rows * cols,
+                             std::numeric_limits<double>::quiet_NaN());
 
     for (Point p : pts) {
         const int i = p.y - min_y;
         const int j = p.x - min_x;
         if (p.z == -9999.99) {
             grid[i * cols + j] = std::numeric_limits<double>::quiet_NaN();
-        }
-        else grid[i * cols + j] = p.z;
+        } else grid[i * cols + j] = p.z;
     }
 
     return MapData {
@@ -139,7 +137,7 @@ MapData read_map(const char* data_path) {
 // └                                                         ┘
 
 void write_elevation_grid(std::ostream& os, const MapData& data) {
-    constexpr std::string_view FMT = 
+    constexpr std::string_view FMT =
         "Shape {{\n"
         "   appearance Appearance {{\n"
         "       material Material {{\n"
@@ -160,13 +158,18 @@ void write_elevation_grid(std::ostream& os, const MapData& data) {
         "}}\n";
 
     std::string heights_str;
+    int count = 0;
     for (int y = data.rows - 1; y >= 0; --y) {
         for (int x = 0; x < data.cols; ++x) {
-            if (data.is_missing(y, x)) heights_str.append("-500.0, ");
-            else std::format_to(std::back_inserter(heights_str),
-                           "{}, ", data[y, x] / 100);
+            if (data.is_missing(y, x)) heights_str.append("2.5, ");
+            else
+                std::format_to(
+                    std::back_inserter(heights_str), "{}, ", data[y, x] / 100);
+            if (count++ == 50) {
+                count = 0;
+                heights_str.push_back('\n');
+            }
         }
-        heights_str.push_back('\n');
     }
     std::print(os, FMT, data.cols, data.rows, heights_str);
 }
