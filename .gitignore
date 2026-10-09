@@ -3,3 +3,5 @@ map_data
 *.out
 *.exe
 *.wrl
+*.dat
+genk

@@ -45,19 +45,14 @@ struct MapData {
 
 /// 建物
 struct Building {
-    double x1, y1; // 左下の座標
-    double x2, y2; // 右上の座標
-    double height; // 高さ
-};
-
-/// 地面
-struct Ground {
-    // TODO:
+    // TODO: 
 };
 
 // ┌                                                         ┐
 // │                      アルゴリズム                       │
 // └                                                         ┘
+
+
 
 // ┌                                                         ┐
 // │                       データ入力                        │
@@ -147,8 +142,8 @@ void write_elevation_grid(std::ostream& os, const MapData& data) {
         "   geometry ElevationGrid {{\n"
         "       xDimension {0}\n"
         "       zDimension {1}\n"
-        "       xSpacing 0.01\n"
-        "       zSpacing 0.01\n"
+        "       xSpacing 1\n"
+        "       zSpacing 1\n"
         "       solid TRUE\n"
         "       ccw TRUE\n"
         "       height [\n"
@@ -157,21 +152,21 @@ void write_elevation_grid(std::ostream& os, const MapData& data) {
         "   }}\n"
         "}}\n";
 
-    std::string heights_str;
+    std::string buf;
     int count = 0;
     for (int y = data.rows - 1; y >= 0; --y) {
         for (int x = 0; x < data.cols; ++x) {
-            if (data.is_missing(y, x)) heights_str.append("2.5, ");
+            if (data.is_missing(y, x)) buf.append("100, ");
             else
                 std::format_to(
-                    std::back_inserter(heights_str), "{}, ", data[y, x] / 100);
+                    std::back_inserter(buf), "{}, ", data[y, x]);
             if (count++ == 50) {
                 count = 0;
-                heights_str.push_back('\n');
+                buf.push_back('\n');
             }
         }
     }
-    std::print(os, FMT, data.cols, data.rows, heights_str);
+    std::print(os, FMT, data.cols, data.rows, buf);
 }
 
 void write_vrml(const char* file_path, const MapData& data) {
@@ -190,6 +185,17 @@ int main(int argc, const char** argv) {
         return 1;
     }
 
-    MapData data = read_map(argv[1]);
-    write_vrml("out.wrl", data);
+    auto data = read_map(argv[1]).grid;
+    std::ranges::sort(data);
+    auto [min_height, max_height] = std::ranges::minmax(data);
+
+    auto it = data.cbegin();
+    for (int i = -30; i <= max_height; i += 5) {
+        auto end = std::ranges::upper_bound(data, i + 5);
+        std::size_t len = end - it;
+        std::println("{} <= x < {}: {}", i, i + 5, len);
+        it = end;
+    }
+
+    //write_vrml("out.wrl", data);
 }
