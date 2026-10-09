@@ -1,1 +1,1 @@
-g++ src/main.cpp -O2 -std=c++23
+g++ src/main.cpp -std=c++23
