@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <exception>
 #include <fstream>
 #include <limits>
 #include <print>
@@ -9,6 +10,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "third_party/argparse.hpp"
 
 // デバック用マクロ
 #define dbg() std::println(stderr, "\x1b[1;33m[DEBUG: {} line]\x1b[m", __LINE__)
@@ -131,8 +134,12 @@ MapData read_map(const char* data_path) {
 // │                        VRML出力                         │
 // └                                                         ┘
 
-void write_elevation_grid(std::ostream& os, const MapData& data) {
-    constexpr std::string_view FMT =
+/// 点群をElevationGridでout.wrlに出力
+void generate_points(const MapData& data) {
+    std::ofstream ofs("out.wrl");
+    std::println(ofs, "#VRML V2.0 utf8");
+
+    constexpr std::string_view FMT1 =
         "Shape {{\n"
         "   appearance Appearance {{\n"
         "       material Material {{\n"
@@ -146,56 +153,101 @@ void write_elevation_grid(std::ostream& os, const MapData& data) {
         "       zSpacing 1\n"
         "       solid TRUE\n"
         "       ccw TRUE\n"
-        "       height [\n"
-        "{2}"
+        "       height [\n";
+
+    constexpr std::string_view FMT2 = 
         "       ]\n"
         "   }}\n"
         "}}\n";
 
-    std::string buf;
+    std::print(ofs, FMT1, data.cols, data.rows);
+
     int count = 0;
     for (int y = data.rows - 1; y >= 0; --y) {
         for (int x = 0; x < data.cols; ++x) {
-            if (data.is_missing(y, x)) buf.append("100, ");
+            if (data.is_missing(y, x)) std::print(ofs, "100, ");
             else
-                std::format_to(
-                    std::back_inserter(buf), "{}, ", data[y, x]);
+                std::print(ofs, "{}, ", data[y, x]);
             if (count++ == 50) {
                 count = 0;
-                buf.push_back('\n');
+                std::println(ofs);
             }
         }
     }
-    std::print(os, FMT, data.cols, data.rows, buf);
+
+    std::print(ofs, FMT2);
 }
 
 void write_vrml(const char* file_path, const MapData& data) {
-    std::ofstream ofs(file_path);
-    std::println(ofs, "#VRML V2.0 utf8");
-    write_elevation_grid(ofs, data);
 }
 
 // ┌                                                         ┐
 // │                     メインエントリ                      │
 // └                                                         ┘
 
-int main(int argc, const char** argv) {
-    if (argc != 2) {
-        std::println(stderr, "使い方: {} <入力ファイル>", argv[0]);
-        return 1;
+enum class Command {
+    ReportHeights,
+    GeneratePoints
+};
+
+struct Option : argparse::Args {
+    std::string& command = arg("コマンド");
+    std::string& file_path = arg("入力ファイル");
+
+    void help() override {
+        std::println("\x1b[1;4m使い方\x1b[m\n  \x1b[1m./genk <コマンド> <地図データ>\x1b[m\n");
+
+        std::println("\x1b[1;34m./genk report-heights <地図データ>\x1b[m");
+        std::println("\t点群の高さの度数分布表を表示\n");
+
+        std::println("\x1b[1;34m./genk gen-points <地図データ>\x1b[m");
+        std::println("\t地図データから点群を直接出力\n");
     }
 
-    auto data = read_map(argv[1]).grid;
-    std::ranges::sort(data);
-    auto [min_height, max_height] = std::ranges::minmax(data);
+    Command parse_command() {
+        if (command == "report-heights") return Command::ReportHeights;
+        if (command == "gen-points") return Command::GeneratePoints;
+        throw std::runtime_error(std::format("未知なコマンド名: {}", command));
+    }
+};
 
-    auto it = data.cbegin();
+void report_heights(std::vector<double>& heights) {
+    std::ranges::sort(heights);
+    const auto [min_height, max_height] = std::ranges::minmax(heights);
+
+    auto it = heights.cbegin();
+
     for (int i = -30; i <= max_height; i += 5) {
-        auto end = std::ranges::upper_bound(data, i + 5);
+        auto end = std::ranges::lower_bound(it, heights.cend(), i + 5);
         std::size_t len = end - it;
+
         std::println("{} <= x < {}: {}", i, i + 5, len);
         it = end;
     }
+}
 
-    //write_vrml("out.wrl", data);
+int main(int argc, const char** argv) {
+    Option opt;
+    Command command;
+    try {
+        opt.parse(argc, argv, true);
+        command = opt.parse_command();
+    } catch (const std::runtime_error& e) {
+        std::println("\x1b[1;31mエラー:\x1b[m {}\n", e.what());
+        opt.help();
+        return 1;
+    }
+
+    try {
+        auto data = read_map(opt.file_path.c_str());
+        switch (command) {
+            case Command::ReportHeights: report_heights(data.grid);
+            case Command::GeneratePoints: generate_points(data);
+        }
+    } catch (const std::exception& e) {
+        std::println("\x1b[1;31mエラー:\x1b[m {}", e.what());
+        return 1;
+    }
+
+    return 0;
 }
