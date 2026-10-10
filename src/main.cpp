@@ -8,6 +8,7 @@
 #include <print>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -134,9 +135,11 @@ MapData read_map(const char* data_path) {
 // │                        VRML出力                         │
 // └                                                         ┘
 
+
+
 /// 点群をElevationGridでout.wrlに出力
-void generate_points(const MapData& data) {
-    std::ofstream ofs("out.wrl");
+void generate_points(const MapData& data, std::string_view out_filename) {
+    std::ofstream ofs(out_filename.data());
     std::println(ofs, "#VRML V2.0 utf8");
 
     constexpr std::string_view FMT1 =
@@ -178,36 +181,41 @@ void generate_points(const MapData& data) {
     std::print(ofs, FMT2);
 }
 
-void write_vrml(const char* file_path, const MapData& data) {
-}
-
 // ┌                                                         ┐
 // │                     メインエントリ                      │
 // └                                                         ┘
 
 enum class Command {
     ReportHeights,
-    GeneratePoints
+    GeneratePoints,
 };
 
 struct Option : argparse::Args {
     std::string& command = arg("コマンド");
     std::string& file_path = arg("入力ファイル");
+    std::string& output_filename = kwarg("o", "")
+        .set_default("out.wrl");
 
     void help() override {
-        std::println("\x1b[1;4m使い方\x1b[m\n  \x1b[1m./genk <コマンド> <地図データ>\x1b[m\n");
+        std::println("\x1b[1;4m使い方\x1b[m\n\n\x1b[1m"
+                     "./genk \x1b[2m[オプション...]\x1b[m <コマンド> <地図データ>\x1b[m\n");
+        std::println("\x1b[1;4mコマンド\x1b[m\n");
+        std::println("\x1b[1;34mreport-heights\x1b[m\t\t点群の高さの度数分布表を表示");
+        std::println("\x1b[1;34mgen-points\x1b[m\t\t地図データから点群を直接出力");
 
-        std::println("\x1b[1;34m./genk report-heights <地図データ>\x1b[m");
-        std::println("\t点群の高さの度数分布表を表示\n");
-
-        std::println("\x1b[1;34m./genk gen-points <地図データ>\x1b[m");
-        std::println("\t地図データから点群を直接出力\n");
+        std::println();
+        std::println("\x1b[1;4mオプション\x1b[m\n");
+        std::println("\x1b[1;34m-o <ファイル名>\x1b[m\t\t出力ファイル名を指定");
     }
 
-    Command parse_command() {
+    Command parse_command() const {
         if (command == "report-heights") return Command::ReportHeights;
         if (command == "gen-points") return Command::GeneratePoints;
         throw std::runtime_error(std::format("未知なコマンド名: {}", command));
+    }
+
+    void normalize_output_filename() const {
+        if (!output_filename.ends_with(".wrl")) output_filename.append(".wrl");
     }
 };
 
@@ -231,6 +239,7 @@ int main(int argc, const char** argv) {
     Command command;
     try {
         opt.parse(argc, argv, true);
+        opt.normalize_output_filename();
         command = opt.parse_command();
     } catch (const std::runtime_error& e) {
         std::println("\x1b[1;31mエラー:\x1b[m {}\n", e.what());
@@ -242,7 +251,7 @@ int main(int argc, const char** argv) {
         auto data = read_map(opt.file_path.c_str());
         switch (command) {
             case Command::ReportHeights: report_heights(data.grid);
-            case Command::GeneratePoints: generate_points(data);
+            case Command::GeneratePoints: generate_points(data, opt.output_filename);
         }
     } catch (const std::exception& e) {
         std::println("\x1b[1;31mエラー:\x1b[m {}", e.what());
