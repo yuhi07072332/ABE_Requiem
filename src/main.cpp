@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <map>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -53,8 +54,23 @@ struct Building {
 };
 
 // ┌                                                         ┐
-// │                      アルゴリズム                       │
+// │                       データ処理                        │
 // └                                                         ┘
+
+/// @brief 高さの度数分布を計算する
+/// @details 階級幅は5、範囲は[-20, 195)とする
+std::map<int, int> calc_frequency(const std::vector<double>& heights, int width = 5) {
+    std::map<int, int> freq;
+
+    for (double height : heights) {
+        if (std::isnan(height)) continue;
+        int lower = static_cast<int>(height / width) * width;
+        if (auto it = freq.find(lower); it != freq.end()) it->second++;
+        else freq.try_emplace(lower, 1);
+    }
+
+    return freq;
+}
 
 
 
@@ -98,7 +114,7 @@ BoundingBox read_points(const char* data_path) {
         max_y = std::max(max_y, (int)y);
     }
 
-    return {pts, min_x, min_y, max_x, max_y};
+    return {std::move(pts), min_x, min_y, max_x, max_y};
 }
 
 /// @brief 地図データから点群を読み込み、`MapData`を作成
@@ -134,8 +150,6 @@ MapData read_map(const char* data_path) {
 // ┌                                                         ┐
 // │                        VRML出力                         │
 // └                                                         ┘
-
-
 
 /// 点群をElevationGridでout.wrlに出力
 void generate_points(const MapData& data, std::string_view out_filename) {
@@ -219,19 +233,10 @@ struct Option : argparse::Args {
     }
 };
 
-void report_heights(std::vector<double>& heights) {
-    std::ranges::sort(heights);
-    const auto [min_height, max_height] = std::ranges::minmax(heights);
-
-    auto it = heights.cbegin();
-
-    for (int i = -30; i <= max_height; i += 5) {
-        auto end = std::ranges::lower_bound(it, heights.cend(), i + 5);
-        std::size_t len = end - it;
-
-        std::println("{} <= x < {}: {}", i, i + 5, len);
-        it = end;
-    }
+void report_heights(const std::vector<double>& heights) {
+    auto freq = calc_frequency(heights);
+    for (auto [lower, frequency] : freq) 
+        std::println("\"[{:>3}, {:>3}]\", {}", lower, lower + 5, frequency);
 }
 
 int main(int argc, const char** argv) {
@@ -242,7 +247,7 @@ int main(int argc, const char** argv) {
         opt.normalize_output_filename();
         command = opt.parse_command();
     } catch (const std::runtime_error& e) {
-        std::println("\x1b[1;31mエラー:\x1b[m {}\n", e.what());
+        std::println(stderr, "\x1b[1;31mエラー:\x1b[m {}\n", e.what());
         opt.help();
         return 1;
     }
@@ -254,7 +259,7 @@ int main(int argc, const char** argv) {
             case Command::GeneratePoints: generate_points(data, opt.output_filename);
         }
     } catch (const std::exception& e) {
-        std::println("\x1b[1;31mエラー:\x1b[m {}", e.what());
+        std::println(stderr, "\x1b[1;31mエラー:\x1b[m {}", e.what());
         return 1;
     }
 
