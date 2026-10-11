@@ -46,6 +46,7 @@ struct MapData {
     double at(int i, int j) const { return grid.at(i * cols + j); }
     double& at(int i, int j) { return grid.at(i * cols + j); }
 
+    /// i行j列に対応するPointを取得
     Point point_at(int i, int j) const {
         return Point {x + j, z + i, at(i, j)};
     }
@@ -99,6 +100,11 @@ std::pair<int, int> max2(const std::map<int, int>& data) {
 ///     - チャンク内の最も低い高さが地面の候補にあれば、チャンク内でそれを地面
 ///       の高さの基準とする
 ///     - 基準よりNメートル高ければ地面以外と判定する
+///
+/// 可能な問題点:
+/// * 斜めの地面を建物に誤判定することがある
+/// * 逆に建物が地面に誤判定することがある
+/// * チャンク間のつなぎがあまり綺麗じゃないことがある
 std::vector<Point> find_ground(const MapData& data) {
     deco::println(deco::bold | deco::fg(deco::yellow), "地面判定中...");
     constexpr int N = 2;
@@ -366,30 +372,30 @@ struct Option : argparse::Args {
     std::string& output_filename = kwarg("o", "").set_default("out.wrl");
 
     void help() override {
-        const deco::Style placeholder = deco::fg(deco::bright_yellow);
-        const deco::Style title = deco::bold | deco::underline;
-        const deco::Style highlight = deco::bold | deco::fg(deco::bright_blue);
+        const deco::Style placeholder_s = deco::fg(deco::bright_yellow);
+        const deco::Style title_s = deco::bold | deco::underline;
+        const deco::Style highlight_s = deco::bold | deco::fg(deco::bright_blue);
 
-        deco::println(title, "使い方\n");
+        deco::println(title_s, "使い方\n");
         std::println("./genk {} {} {}",
                      deco::dim | "[オプション...]",
-                     placeholder | "<コマンド>",
-                     placeholder | "<地図データファイル>");
+                     placeholder_s | "<コマンド>",
+                     placeholder_s | "<地図データファイル>");
         std::println();
 
-        deco::println(title, "コマンド\n");
+        deco::println(title_s, "コマンド\n");
 
         std::println("{}\t\t点群の高さの度数分布表を表示",
-                     highlight | "report-heights");
+                     highlight_s | "report-heights");
         std::println("{}\t\t地面判定アルゴリズムをテスト",
-                     highlight | "test-ground");
+                     highlight_s | "test-ground");
         std::println("{}\t\t地図データから点群を直接出力",
-                     highlight | "gen-points");
+                     highlight_s | "gen-points");
         std::println();
 
-        deco::println(title, "オプション\n");
+        deco::println(title_s, "オプション\n");
         std::println("{}\t\t出力ファイル名を指定",
-                     highlight | "-o <ファイル名>");
+                     highlight_s | "-o <ファイル名>");
     }
 
     Command parse_command() const {
