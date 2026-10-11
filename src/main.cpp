@@ -91,19 +91,22 @@ std::pair<int, int> max2(const std::map<int, int>& data) {
 /// @brief 地面と判定された点群を返す
 /// @details
 /// 暫定のアルゴリズム:
-/// * 高さの度数が最も高い2つの階級を地面の候補とし、高さがそれより低い階級も地面の候補とする
+/// * 高さの度数が最も高い2つの階級(の下限値)を地面高さの候補とし、高さがそれより低い階級も地面の候補とする
 /// * マップを16 * 16のチャンクに分けて、チャンクごとに：
 ///     - チャンク内の最も低い高さが地面の候補にあれば、チャンク内でそれを地面の高さの基準とする
 ///     - 基準よりNメートル高ければ地面以外と判定する
 std::vector<Point> find_ground(const MapData& data) {
+    std::println("地面判定中...");
     constexpr int N = 2;
     constexpr int CHUNK_WIDTH = 16;
     constexpr int CHUNK_HEIGHT = 16;
 
     auto freq = calc_frequency(data.grid);
     auto freq_max2 = max2(freq);
+
     // これ以下の高さを地面の候補とする
-    double ground_candidate_height = std::max(freq[freq_max2.first], freq[freq_max2.second]);
+    double ground_candidate_height = std::max(freq_max2.first, freq_max2.second);
+    std::println("地面基準: {}", ground_candidate_height);
 
     std::vector<Point> ground_points;
 
