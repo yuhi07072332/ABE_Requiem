@@ -1,11 +1,11 @@
 #include <algorithm>
-#include <map>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
 #include <exception>
 #include <fstream>
 #include <limits>
+#include <map>
 #include <print>
 #include <stdexcept>
 #include <string>
@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "third_party/argparse.hpp"
+#include "third_party/decoterm/format.hpp"
 #include "third_party/delaunator/delaunator.hpp"
 
 // デバック用マクロ
@@ -46,7 +47,7 @@ struct MapData {
     double& at(int i, int j) { return grid.at(i * cols + j); }
 
     Point point_at(int i, int j) const {
-        return Point { x + j, z + i, at(i, j) };
+        return Point {x + j, z + i, at(i, j)};
     }
 
     /// i行j列の点が欠損点かどうかを判定
@@ -59,7 +60,8 @@ struct MapData {
 
 /// @brief 高さの度数分布を計算する
 /// @returns keyを階級の下限値, valueを度数とするmap
-std::map<int, int> calc_frequency(const std::vector<double>& heights, int width = 5) {
+std::map<int, int> calc_frequency(const std::vector<double>& heights,
+                                  int width = 5) {
     std::map<int, int> freq;
 
     for (double height : heights) {
@@ -91,12 +93,14 @@ std::pair<int, int> max2(const std::map<int, int>& data) {
 /// @brief 地面と判定された点群を返す
 /// @details
 /// 暫定のアルゴリズム:
-/// * 高さの度数が最も高い2つの階級(の下限値)を地面高さの候補とし、高さがそれより低い階級も地面の候補とする
+/// * 高さの度数が最も高い2つの階級(の下限値)を地面高さの候補とし、高さがそれ
+///   より低い階級も地面の候補とする
 /// * マップを16 * 16のチャンクに分けて、チャンクごとに：
-///     - チャンク内の最も低い高さが地面の候補にあれば、チャンク内でそれを地面の高さの基準とする
+///     - チャンク内の最も低い高さが地面の候補にあれば、チャンク内でそれを地面
+///       の高さの基準とする
 ///     - 基準よりNメートル高ければ地面以外と判定する
 std::vector<Point> find_ground(const MapData& data) {
-    std::println("地面判定中...");
+    deco::println(deco::bold | deco::fg(deco::yellow), "地面判定中...");
     constexpr int N = 2;
     constexpr int CHUNK_WIDTH = 16;
     constexpr int CHUNK_HEIGHT = 16;
@@ -105,7 +109,8 @@ std::vector<Point> find_ground(const MapData& data) {
     auto freq_max2 = max2(freq);
 
     // これ以下の高さを地面の候補とする
-    double ground_candidate_height = std::max(freq_max2.first, freq_max2.second);
+    double ground_candidate_height =
+        std::max(freq_max2.first, freq_max2.second);
     std::println("地面基準: {}", ground_candidate_height);
 
     std::vector<Point> ground_points;
@@ -114,7 +119,7 @@ std::vector<Point> find_ground(const MapData& data) {
         // チャンク内高さが一番低い点を探す
         double min_height = std::numeric_limits<double>::max();
         for (int i = i_begin; i < i_begin + CHUNK_HEIGHT; ++i) {
-            for (int j = j_begin; j < j_begin + CHUNK_HEIGHT; ++j) {
+            for (int j = j_begin; j < j_begin + CHUNK_WIDTH; ++j) {
                 if (data.is_missing(i, j)) continue;
                 if (data[i, j] < min_height) min_height = data[i, j];
             }
@@ -123,7 +128,7 @@ std::vector<Point> find_ground(const MapData& data) {
         if (min_height > ground_candidate_height) return;
 
         for (int i = i_begin; i < i_begin + CHUNK_HEIGHT; ++i) {
-            for (int j = j_begin; j < j_begin + CHUNK_HEIGHT; ++j) {
+            for (int j = j_begin; j < j_begin + CHUNK_WIDTH; ++j) {
                 Point p = data.point_at(i, j);
                 if (p.y < min_height + N) ground_points.push_back(p);
             }
@@ -144,7 +149,6 @@ std::vector<Point> find_ground(const MapData& data) {
 
     return ground_points;
 }
-
 
 // ┌                                                         ┐
 // │                       データ入力                        │
@@ -203,7 +207,8 @@ MapData read_map(const char* data_path) {
                              std::numeric_limits<double>::quiet_NaN());
 
     for (Point p : pts) {
-        const int i = p.z - min_z;
+        // VRMLのz軸の方向が逆なので読み込み段階で逆にする
+        const int i = (rows - 1) - (p.z - min_z);
         const int j = p.x - min_x;
         if (p.y == -9999.99) {
             grid[i * cols + j] = std::numeric_limits<double>::quiet_NaN();
@@ -231,25 +236,25 @@ void generate_points(const MapData& data, std::string_view out_filename) {
     std::println(ofs, VRML_HEADER);
 
     constexpr std::string_view FMT1 =
-        "Shape {{\n"
-        "   appearance Appearance {{\n"
-        "       material Material {{\n"
-        "           diffuseColor 0.812 0.664 0.988\n"
-        "       }}\n"
-        "   }}\n"
-        "   geometry ElevationGrid {{\n"
-        "       xDimension {0}\n"
-        "       zDimension {1}\n"
-        "       xSpacing 1\n"
-        "       zSpacing 1\n"
-        "       solid TRUE\n"
-        "       ccw TRUE\n"
-        "       height [\n";
+"Shape {{\n"
+"   appearance Appearance {{\n"
+"       material Material {{\n"
+"           diffuseColor 0.812 0.664 0.988\n"
+"       }}\n"
+"   }}\n"
+"   geometry ElevationGrid {{\n"
+"       xDimension {0}\n"
+"       zDimension {1}\n"
+"       xSpacing 1\n"
+"       zSpacing 1\n"
+"       solid TRUE\n"
+"       ccw TRUE\n"
+"       height [\n";
 
     constexpr std::string_view FMT2 = 
-        "       ]\n"
-        "   }}\n"
-        "}}\n";
+"       ]\n"
+"   }}\n"
+"}}\n";
 
     std::print(ofs, FMT1, data.cols, data.rows);
 
@@ -257,8 +262,7 @@ void generate_points(const MapData& data, std::string_view out_filename) {
     for (int z = 0; z < data.rows; ++z) {
         for (int x = 0; x < data.cols; ++x) {
             if (data.is_missing(z, x)) std::print(ofs, "100, ");
-            else
-                std::print(ofs, "{}, ", data[z, x]);
+            else std::print(ofs, "{}, ", data[z, x]);
             if (count++ == 50) {
                 count = 0;
                 std::println(ofs);
@@ -270,28 +274,29 @@ void generate_points(const MapData& data, std::string_view out_filename) {
 }
 
 /// @brief 点群に対しドロネーの三角形分割を実行し、IndexFacedSetとして出力
-/// @returns 分割された三角形の座標のインデックス
-void delaunay_triangulation(const std::vector<Point>& pts, std::ostream& os) {
+/// @returns 三角形の面数
+int write_delaunay_triangulation(const std::vector<Point>& pts,
+                                 std::ostream& os) {
     constexpr std::string_view FMT1 = 
-"Shape {{"
-"    appearance Appearance {{"
-"        material Material {{"
-"            diffuseColor 0.3 0.5 0.7"
-"        }}"
-"    }}"
-"    geometry IndexedFaceSet {{"
-"        coord Coordinate {{"
-"            point [";
+"Shape {{\n"
+"    appearance Appearance {{\n"
+"        material Material {{\n"
+"            diffuseColor 0.3 0.5 0.7\n"
+"        }}\n"
+"    }}\n"
+"    geometry IndexedFaceSet {{\n"
+"        coord Coordinate {{\n"
+"            point [\n";
 
     constexpr std::string_view FMT2 =
-"            ]"
-"        }}"
-"        coordIndex [";
+"            ]\n"
+"        }}\n"
+"        coordIndex [\n";
 
     constexpr std::string_view FMT3 =
-"        ]"
-"    }}"
-"}}";
+"        ]\n"
+"    }}\n"
+"}}\n";
 
     std::vector<double> coords;
     coords.reserve(pts.size() * 2);
@@ -302,24 +307,25 @@ void delaunay_triangulation(const std::vector<Point>& pts, std::ostream& os) {
 
     delaunator::Delaunator d(coords);
 
-    std::println(os, FMT1);
-    
+    std::print(os, FMT1);
+
     for (Point p : pts) {
         std::println(os, "{} {} {},", p.x, p.y, p.z);
     }
 
-    std::println(os, FMT2);
+    std::print(os, FMT2);
 
     for (std::size_t i = 0; i < d.triangles.size(); i += 3) {
-        std::println(os, "{}, {}, {}, -1",
+        std::println(os,
+                     "{}, {}, {}, -1",
                      d.triangles[i],
                      d.triangles[i + 1],
                      d.triangles[i + 2]);
     }
 
-    std::println(os, FMT3);
+    std::print(os, FMT3);
+    return d.triangles.size() / 3;
 }
-
 
 // ┌                                                         ┐
 // │                     メインエントリ                      │
@@ -327,18 +333,25 @@ void delaunay_triangulation(const std::vector<Point>& pts, std::ostream& os) {
 
 void report_heights(const std::vector<double>& heights) {
     auto freq = calc_frequency(heights);
-    for (auto [lower, frequency] : freq) 
+    for (auto [lower, frequency] : freq)
         std::println("\"[{:>3}, {:>3}]\", {}", lower, lower + 5, frequency);
 }
 
 void test_ground(const MapData& data, std::string_view out_filename) {
     auto ground_points = find_ground(data);
     std::println("マップ内点群数: {}", data.grid.size());
-    std::println("地面判定した点群数: {} (~{}%)", ground_points.size(), ground_points.size() * 100 / data.grid.size());
+    std::println("地面判定した点群数: {} (~{}%)",
+                 ground_points.size(),
+                 ground_points.size() * 100 / data.grid.size());
 
     std::ofstream ofs(out_filename.data());
     std::println(ofs, VRML_HEADER);
-    delaunay_triangulation(ground_points, ofs);
+
+    int triangles = write_delaunay_triangulation(ground_points, ofs);
+    std::println("面数(三角形数): {}", triangles);
+    std::println("総データ量(点 + 面の数): {}",
+                 deco::fg(deco::bright_yellow)
+                     | (ground_points.size() + triangles));
 }
 
 enum class Command {
@@ -350,20 +363,33 @@ enum class Command {
 struct Option : argparse::Args {
     std::string& command = arg("コマンド");
     std::string& file_path = arg("入力ファイル");
-    std::string& output_filename = kwarg("o", "")
-        .set_default("out.wrl");
+    std::string& output_filename = kwarg("o", "").set_default("out.wrl");
 
     void help() override {
-        std::println("\x1b[1;4m使い方\x1b[m\n\n\x1b[1m"
-                     "./genk \x1b[2m[オプション...]\x1b[m <コマンド> <地図データ>\x1b[m\n");
-        std::println("\x1b[1;4mコマンド\x1b[m\n");
-        std::println("\x1b[1;34mreport-heights\x1b[m\t\t点群の高さの度数分布表を表示");
-        std::println("\x1b[1;34mtest-ground\x1b[m\t\t地面判定アルゴリズムをテスト");
-        std::println("\x1b[1;34mgen-points\x1b[m\t\t地図データから点群を直接出力");
+        const deco::Style placeholder = deco::fg(deco::bright_yellow);
+        const deco::Style title = deco::bold | deco::underline;
+        const deco::Style highlight = deco::bold | deco::fg(deco::bright_blue);
 
+        deco::println(title, "使い方\n");
+        std::println("./genk {} {} {}",
+                     deco::dim | "[オプション...]",
+                     placeholder | "<コマンド>",
+                     placeholder | "<地図データファイル>");
         std::println();
-        std::println("\x1b[1;4mオプション\x1b[m\n");
-        std::println("\x1b[1;34m-o <ファイル名>\x1b[m\t\t出力ファイル名を指定");
+
+        deco::println(title, "コマンド\n");
+
+        std::println("{}\t\t点群の高さの度数分布表を表示",
+                     highlight | "report-heights");
+        std::println("{}\t\t地面判定アルゴリズムをテスト",
+                     highlight | "test-ground");
+        std::println("{}\t\t地図データから点群を直接出力",
+                     highlight | "gen-points");
+        std::println();
+
+        deco::println(title, "オプション\n");
+        std::println("{}\t\t出力ファイル名を指定",
+                     highlight | "-o <ファイル名>");
     }
 
     Command parse_command() const {
@@ -378,7 +404,6 @@ struct Option : argparse::Args {
     }
 };
 
-
 int main(int argc, const char** argv) {
     Option opt;
     Command command;
@@ -387,7 +412,10 @@ int main(int argc, const char** argv) {
         opt.normalize_output_filename();
         command = opt.parse_command();
     } catch (const std::runtime_error& e) {
-        std::println(stderr, "\x1b[1;31mエラー:\x1b[m {}\n", e.what());
+        std::println(stderr,
+                     "{} {}\n",
+                     deco::bold | deco::fg(deco::bright_red) | "エラー: ",
+                     e.what());
         opt.help();
         return 1;
     }
@@ -395,12 +423,21 @@ int main(int argc, const char** argv) {
     try {
         auto data = read_map(opt.file_path.c_str());
         switch (command) {
-            case Command::ReportHeights: report_heights(data.grid); break;
-            case Command::GeneratePoints: generate_points(data, opt.output_filename); break;
-            case Command::TestGround: test_ground(data, opt.output_filename); break;
+            case Command::ReportHeights:
+                report_heights(data.grid);
+                break;
+            case Command::GeneratePoints:
+                generate_points(data, opt.output_filename);
+                break;
+            case Command::TestGround:
+                test_ground(data, opt.output_filename);
+                break;
         }
     } catch (const std::exception& e) {
-        std::println(stderr, "\x1b[1;31mエラー:\x1b[m {}", e.what());
+        std::println(stderr,
+                     "{} {}\n",
+                     deco::bold | deco::fg(deco::bright_red) | "エラー: ",
+                     e.what());
         return 1;
     }
 

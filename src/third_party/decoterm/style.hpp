@@ -1,0 +1,791 @@
+// C++20 Terminal styling library
+//
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Yuhi0707
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#ifndef DECOTERM_STYLE_HPP
+#define DECOTERM_STYLE_HPP
+
+#include <array>
+#include <cassert>
+#include <charconv>
+#include <cmath>
+#include <concepts>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <ostream>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <version>
+
+#if defined(__cpp_lib_constexpr_cmath) && __cpp_lib_constexpr_cmath >= 202202L
+#define DECO_CONSTEXPR_CMATH constexpr
+#else
+#define DECO_CONSTEXPR_CMATH
+#endif
+
+namespace deco {
+
+struct Style;
+struct AbsoluteStyle;
+
+/// @see Color
+enum class ColorType : uint8_t {
+    Null = 0,
+    DefaultColor,
+    TerminalColor,
+    TrueColor,
+};
+
+template <typename T>
+concept ostream_outputable = requires(std::ostream& os, const T& value) {
+    { os << value } -> std::same_as<std::ostream&>;
+};
+
+namespace detail {
+
+// clang-format off
+
+/// Whether remove_cvref_t<StyleT> is a Style or an AbsoluteStyle.
+/// The requires expression describes the common interface of both types.
+template <typename S>
+concept style_type = (std::is_same_v<std::remove_cvref_t<S>, Style>
+        || std::is_same_v<std::remove_cvref_t<S>, AbsoluteStyle>)
+    && requires(
+        const std::remove_cvref_t<S>& style,
+        const std::remove_cvref_t<S>& other_style,
+        char* out
+    ) {
+        { style.is_null() } -> std::same_as<bool>;
+        { style == other_style } -> std::same_as<bool>;
+        { style != other_style } -> std::same_as<bool>;
+        { style.to_escape(out) } -> std::same_as<char*>;
+    };
+
+// clang-format on
+
+using ColorData = std::array<uint8_t, 3>;
+
+
+// clang-format off
+inline constexpr std::array<std::string_view, 16> SGR_PARAM_FG {
+    "30", "31", "32",
+    "33", "34", "35",
+    "36", "37", "90",
+    "91", "92", "93",
+    "94", "95", "96",
+    "97",
+};
+
+inline constexpr std::array<std::string_view, 16> SGR_PARAM_BG {
+    "40", "41", "42",
+    "43", "44", "45",
+    "46", "47", "100",
+    "101", "102", "103",
+    "104", "105", "106",
+    "107",
+};
+
+inline constexpr std::array<std::string_view, 8> SGR_PARAM_STYLE {
+    "1" /*bold*/,           "2"  /*dim*/,           "3" /*italic*/,
+    "4" /*underline*/,      "5"  /*blink*/,         "7" /*invert*/,
+    "9" /*strikethrough*/,  "21" /*double underline*/,
+};
+// clang-format on
+
+template <std::output_iterator<const char&> OutputIt>
+constexpr auto write_to(OutputIt out, std::string_view sv) -> OutputIt {
+    for (auto c : sv)
+        *out++ = c;
+    return out;
+}
+
+template <std::output_iterator<const char&> OutputIt>
+constexpr auto write_to(OutputIt out, uint8_t value) {
+    std::array<char, 3> buf {};
+    const auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + 3, value);
+    assert(ec == std::errc {});
+    for (int i = 0; i < ptr - buf.data(); ++i)
+        *out++ = buf[i];
+    return out;
+}
+
+template <bool BG, std::output_iterator<const char&> OutputIt>
+constexpr auto color_to_sgr_params(OutputIt out, ColorType type, ColorData data)
+    -> OutputIt {
+    switch (type) {
+        case ColorType::Null:
+            return out;
+        case ColorType::DefaultColor: {
+            if constexpr (BG) return write_to(out, "49");
+            else return write_to(out, "39");
+        }
+        case ColorType::TerminalColor: {
+            uint8_t index = data[0];
+            if (index < 16) {
+                if constexpr (BG) return write_to(out, SGR_PARAM_BG[index]);
+                else return write_to(out, SGR_PARAM_FG[index]);
+            } else {
+                if constexpr (BG) out = write_to(out, "48;5;");
+                else out = write_to(out, "38;5;");
+                out = write_to(out, index);
+            }
+            return out;
+        }
+        case ColorType::TrueColor: {
+            auto [r, g, b] = data;
+            if constexpr (BG) out = write_to(out, "48;2;");
+            else out = write_to(out, "38;2;");
+            out = write_to(out, r);
+            *out++ = ';';
+            out = write_to(out, g);
+            *out++ = ';';
+            out = write_to(out, b);
+            return out;
+        }
+    }
+    assert(false);
+}
+
+/// A wrapper that stores rvalue or references lvalue.
+template <typename T>
+struct ValueOrRef {
+    explicit constexpr ValueOrRef(T value)
+        requires std::move_constructible<T>
+        : value(std::move(value)) {}
+
+    explicit constexpr ValueOrRef(const T& value)
+        requires(!std::move_constructible<T>
+                 && std::constructible_from<T, const T&>)
+        : value(value) {}
+
+    constexpr auto get() const -> T& { return value; }
+
+  private:
+    mutable T value;
+};
+
+template <typename T>
+struct ValueOrRef<T&> {
+    explicit constexpr ValueOrRef(T& ref) : ptr(std::addressof(ref)) {}
+
+    constexpr auto get() const -> T& { return *ptr; }
+
+  private:
+    mutable T* ptr;
+};
+
+template <typename T>
+    requires(!std::is_lvalue_reference_v<T>)
+ValueOrRef(T&& value) -> ValueOrRef<std::remove_cvref_t<T>>;
+
+template <typename T>
+ValueOrRef(T& ref) -> ValueOrRef<T&>;
+
+template <typename Ret, typename... Args>
+ValueOrRef(Ret(Args...)) -> ValueOrRef<std::decay_t<Ret(Args...)>>;
+
+/// A `ValueOrRef` with a style.
+template <style_type StyleT, typename T>
+struct Styled {
+    using value_type = T;
+
+    constexpr Styled(ValueOrRef<T> value, StyleT style)
+        : store_(std::move(value)),
+          style_(style) {}
+
+    constexpr auto value() const -> T& { return store_.get(); }
+    constexpr auto style() const -> StyleT { return style_; }
+
+  private:
+    ValueOrRef<T> store_;
+    StyleT style_;
+};
+
+template <typename T> struct is_styled : std::false_type {};
+
+template <typename S, typename T>
+struct is_styled<Styled<S, T>> : std::true_type {};
+
+template <typename T>
+concept styled = is_styled<std::remove_cvref_t<T>>::value;
+
+} // namespace detail
+
+// ╔═════════════════════════════════════════════════════════╗
+// ║                          Color                          ║
+// ╚═════════════════════════════════════════════════════════╝
+
+/// @brief Represents a nullable terminal color.
+/// @details
+/// A `Color` is similar to a tagged union with 4 color types.
+/// It stores a `ColorType` and a `uint8_t[3]` containing the data.
+///
+/// Color types:
+/// * `Null` => A null color. It emits no ANSI escape sequence.
+///
+/// * `DefaultColor` => The terminal's default color.
+///
+/// * `TerminalColor` => System 16 color or XTerm 256 color.
+///     `data[0]` stores the index [0, 255], with indices 0-15 corresponding
+///     to the system 16 colors.
+///     (See https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit)
+///
+/// * `TrueColor` => A 24-bit RGB color.
+///     `data[0]`, `data[1]`, `data[2]` store the red, green and blue components
+///     respectively.
+struct Color {
+    static constexpr std::size_t MAX_ESCAPE_SEQ_SIZE = 19;
+
+    /* ----- constructors ----- */
+
+    static constexpr auto default_color() -> Color {
+        return Color(ColorType::DefaultColor, {0, 0, 0});
+    }
+
+    static constexpr auto null_color() -> Color {
+        return Color(ColorType::Null, {0, 0, 0});
+    }
+
+    /// Create a color implicitly from an index in [0, 255]
+    constexpr Color(uint8_t index)
+        : type_(ColorType::TerminalColor),
+          data_({index, 0, 0}) {}
+
+    constexpr explicit Color(uint8_t r, uint8_t g, uint8_t b)
+        : type_(ColorType::TrueColor),
+          data_({r, g, b}) {}
+
+    /* ----- observe ----- */
+
+    constexpr auto operator==(const Color&) const -> bool = default;
+    constexpr auto operator!=(const Color&) const -> bool = default;
+
+    /// equivalent to `!is_null()`
+    constexpr explicit operator bool() const { return !this->is_null(); }
+
+    /// Whether this Color's type is `ColorType::null`
+    constexpr auto is_null() const -> bool { return type_ == ColorType::Null; }
+    constexpr auto type() const -> ColorType { return type_; }
+
+    /// @brief Returns the raw data(`uint8_t[3]`) stored in this Color.
+    /// @details
+    /// Usage:
+    /// ```cpp
+    /// Color col = rgb(32, 64, 128);
+    /// if (col.type() == ColorType::TrueColor) {
+    ///     auto [r, g, b] = col.data();
+    ///     /* ... */
+    /// } else if (col.type() == ColorType::TerminalColor) {
+    ///     uint8_t index = col.data()[0];
+    ///     /* ... */
+    /// }
+    /// ```
+    constexpr auto data() const -> const detail::ColorData& { return data_; }
+
+    /* ----- output ----- */
+
+    [[nodiscard]] auto to_escape_fg() const -> std::string {
+        std::string esc = "\x1b[";
+        detail::color_to_sgr_params<false>(
+            std::back_inserter(esc), type_, data_);
+        esc.push_back('m');
+        return esc;
+    }
+
+    [[nodiscard]] auto to_escape_bg() const -> std::string {
+        std::string esc = "\x1b[";
+        detail::color_to_sgr_params<true>(
+            std::back_inserter(esc), type_, data_);
+        esc.push_back('m');
+        return esc;
+    }
+
+    [[nodiscard]] auto debug_string() const -> std::string {
+        switch (type_) {
+            case ColorType::Null:
+                return "[null_color]";
+            case ColorType::DefaultColor:
+                return "[default_color]";
+            case ColorType::TerminalColor: {
+                return std::string("[terminal_color: ")
+                    .append(std::to_string(data_[0]))
+                    .append("]");
+            }
+            case ColorType::TrueColor: {
+                return std::string("[true_color: ")
+                    .append(std::to_string(data_[0]))
+                    .append(", ")
+                    .append(std::to_string(data_[1]))
+                    .append(", ")
+                    .append(std::to_string(data_[2]))
+                    .append("]");
+            }
+        }
+        assert(false);
+    }
+
+  private:
+    friend struct Style;
+
+    constexpr Color(ColorType type, detail::ColorData data)
+        : type_(type),
+          data_(data) {}
+
+    ColorType type_;
+    detail::ColorData data_;
+};
+
+/// @brief Create a color from RGB
+constexpr auto rgb(uint8_t r, uint8_t g, uint8_t b) -> Color {
+    return Color(r, g, b);
+}
+
+/// @brief Create a color from 0xRRGGBB
+/// @pre rgb <= 0xFFFFFF
+constexpr auto rgb(uint32_t hex) -> Color {
+    // clang-format off
+    if (hex > 0xffffff) 
+        throw std::invalid_argument("deco::rgb(): rgb > 0xffffff");
+    return Color((hex >> 16u) & 0xFFu,
+                    (hex >> 8u) & 0xFFu,
+                    hex & 0xFFu);
+    // clang-format on
+}
+
+/// @brief Create a color from HSV
+/// @param h [0, 360): Hue of the color
+/// @param s [0, 255]: Saturation of the color
+/// @param v [0, 255]: Value (brightness) of the color
+[[nodiscard]]
+inline DECO_CONSTEXPR_CMATH auto hsv(uint16_t h, uint8_t s, uint8_t v) // NOLINT
+    -> Color {
+    // clang-format off
+
+    if (h < 0 || h >= 360) throw std::invalid_argument(
+        "deco::hsv(): h is not in range [0, 360)");
+
+    float hp = h / 60.f;                               //NOLINT
+    float sp = s / 255.0f;                             //NOLINT
+    float vp = v / 255.0f;                             //NOLINT
+
+    float f = hp - std::floor(hp);
+    uint8_t p = std::round(vp * (1 - sp) * 255);             //NOLINT
+    uint8_t q = std::round(vp * (1 - (f * sp)) * 255);       //NOLINT
+    uint8_t t = std::round(vp * (1 - ((1 - f) * sp)) * 255); //NOLINT
+
+    switch (h / 60) {
+        case 0 : return Color(v, t, p);
+        case 1 : return Color(q, v, p);
+        case 2 : return Color(p, v, t);
+        case 3 : return Color(p, q, v);
+        case 4 : return Color(t, p, v);
+        case 5 : return Color(v, p, q);
+        default: assert(false);
+    }
+
+    return Color::null_color();
+    // clang-format on 
+}
+
+/* ----- color constants ----- */
+
+inline constexpr Color default_color   = Color::default_color();
+inline constexpr Color null_color      = Color::null_color();
+
+inline constexpr Color black           = Color(0);
+inline constexpr Color red             = Color(1);
+inline constexpr Color green           = Color(2);
+inline constexpr Color yellow          = Color(3);
+inline constexpr Color blue            = Color(4);
+inline constexpr Color magenta         = Color(5);
+inline constexpr Color cyan            = Color(6);
+inline constexpr Color white           = Color(7);
+inline constexpr Color bright_black    = Color(8);
+inline constexpr Color bright_red      = Color(9);
+inline constexpr Color bright_green    = Color(10);
+inline constexpr Color bright_yellow   = Color(11);
+inline constexpr Color bright_blue     = Color(12);
+inline constexpr Color bright_magenta  = Color(13);
+inline constexpr Color bright_cyan     = Color(14);
+inline constexpr Color bright_white    = Color(15);
+
+// clang-format on
+
+// ╔═════════════════════════════════════════════════════════╗
+// ║                          Style                          ║
+// ╚═════════════════════════════════════════════════════════╝
+
+/// @brief Represents a nullable terminal style.
+/// @details
+/// * It contains 8 emphasis flags and 2 `Color`s for foreground color and
+/// background color.
+///
+/// * A null 'Style' emits no ANSI escape sequence.
+struct Style {
+    // clang-format off
+    enum Emphasis : uint8_t {                              //NOLINT
+        None                = 0,
+        Bold                = 1u << 0u,
+        Dim                 = 1u << 1u,
+        Italic              = 1u << 2u,
+        Underline           = 1u << 3u,
+        Blink               = 1u << 4u,
+        Invert              = 1u << 5u,
+        Strikethrough       = 1u << 6u,
+        UnderlineDouble     = 1u << 7u,
+    };
+
+    static constexpr std::size_t MAX_ESCAPE_SEQ_SIZE =
+        ((Color::MAX_ESCAPE_SEQ_SIZE - 3 + 1) * 2) + 16 + 3;
+
+    // clang-format on
+
+    explicit constexpr Style(uint8_t emphasis = 0,
+                             Color fg = null_color,
+                             Color bg = null_color)
+        : fg_data_(fg.data()),
+          bg_data_(bg.data()),
+          color_types_((static_cast<unsigned int>(fg.type()) << 4u)
+                       | static_cast<unsigned int>(bg.type())),
+          emphasis_(emphasis) {}
+
+    // ----- operators -----
+
+    /// @brief Combines two styles.
+    /// @details
+    /// It works like applying 2 ANSI escape sequences, meaning that
+    /// `std::cout << style1 << style2` is roughly equivalent to
+    /// `std::cout << (style1 | style2)`.
+    ///
+    /// For `lhs | rhs`:
+    /// * Do `OR` operation of both emphasis.
+    /// * Each non-null color in `rhs` overrides the corresponding color in
+    ///  `lhs`.
+    ///
+    /// Examples:
+    /// (italic, fg=red) | (bold) = (italic | bold, fg=red)
+    /// (fg=black, bg=blue) | (bg=green) = (fg=black, bg=green)
+    constexpr auto operator|(Style rhs) const -> Style {
+        Style combined = *this;
+        combined.emphasis_ |= rhs.emphasis_;
+        if (!rhs.fg_null()) {
+            combined.fg_data_ = rhs.fg_data_;
+            combined.set_fg_type(rhs.fg_type());
+        }
+        if (!rhs.bg_null()) {
+            combined.bg_data_ = rhs.bg_data_;
+            combined.set_bg_type(rhs.bg_type());
+        }
+        return combined;
+    }
+
+    constexpr void operator|=(Style rhs) { *this = *this | rhs; }
+
+    constexpr auto operator==(const Style&) const -> bool = default;
+    constexpr auto operator!=(const Style&) const -> bool = default;
+
+    /// equivalent to !is_null()
+    constexpr explicit operator bool() const { return !this->is_null(); }
+
+    // ----- observe -----
+
+    constexpr auto emphasis() const -> uint8_t { return emphasis_; }
+    constexpr auto fg() const -> Color { return {this->fg_type(), fg_data_}; }
+    constexpr auto bg() const -> Color { return {this->bg_type(), bg_data_}; }
+
+    /// Will `to_escape()` return a empty string?
+    constexpr auto is_null() const -> bool {
+        return emphasis_ == None && this->fg_null() && this->bg_null();
+    }
+
+    // ----- output -----
+
+    /// Writes SGR parameters to the output iterator in the form "P1;P2;...;Pn".
+    template <std::output_iterator<const char&> OutputIt>
+    constexpr auto to_sgr_params(OutputIt out) const -> OutputIt {
+        using namespace detail;
+        bool needs_separate = false;
+
+        if (!this->fg_null()) {
+            out = color_to_sgr_params<false>(out, this->fg_type(), fg_data_);
+            needs_separate = true;
+        }
+        if (!this->bg_null()) {
+            if (needs_separate) *out++ = ';';
+            out = color_to_sgr_params<true>(out, this->bg_type(), bg_data_);
+            needs_separate = true;
+        }
+
+        uint8_t current_flag = emphasis_;
+        int count = 0;
+        do {
+            if (current_flag & 1u) {
+                if (needs_separate) *out++ = ';';
+                out = write_to(out, SGR_PARAM_STYLE[count]);
+                needs_separate = true;
+            }
+            count++;
+            current_flag >>= 1u;
+        } while (current_flag);
+        return out;
+    }
+
+    /// Writes ANSI escape sequence to the output iterator.
+    template <std::output_iterator<const char&> OutputIt>
+    constexpr auto to_escape(OutputIt out) const -> OutputIt {
+        if (this->is_null()) return out;
+
+        out = detail::write_to(out, "\x1b[");
+        out = this->to_sgr_params(out);
+        *out++ = 'm';
+        return out;
+    }
+
+    /// Writes ANSI escape sequence to a string.
+    [[nodiscard]] auto to_escape() const -> std::string {
+        std::string esc;
+        this->to_escape(std::back_inserter(esc));
+        return esc;
+    }
+
+    [[nodiscard]] auto debug_string() const -> std::string {
+        std::string debug = "[flags=";
+        std::array<char, 8> buf {};
+
+        for (unsigned int i = 0; i < 8; i++) {
+            if ((static_cast<unsigned int>(emphasis_) >> (7u - i)) & 1u)
+                buf[i] = '1';
+            else buf[i] = '0';
+        }
+
+        return debug.append(buf.data(), 8)
+            .append(", fg=")
+            .append(this->fg().debug_string())
+            .append(", bg=")
+            .append(this->bg().debug_string())
+            .append("]");
+    }
+
+  private:
+    constexpr auto fg_type() const -> ColorType {
+        return static_cast<ColorType>(
+            (static_cast<unsigned int>(color_types_) >> 4u) & 0x0Fu);
+    }
+
+    constexpr auto bg_type() const -> ColorType {
+        return static_cast<ColorType>(color_types_ & 0x0Fu);
+    }
+
+    constexpr void set_fg_type(ColorType type) {
+        color_types_ =
+            (static_cast<unsigned int>(type) << 4u) | (color_types_ & 0x0Fu);
+    }
+
+    constexpr void set_bg_type(ColorType type) {
+        color_types_ =
+            (static_cast<unsigned int>(type) & 0x0Fu) | (color_types_ & 0xF0u);
+    }
+
+    constexpr auto fg_null() const -> bool {
+        return this->fg_type() == ColorType::Null;
+    }
+    constexpr auto bg_null() const -> bool {
+        return this->bg_type() == ColorType::Null;
+    }
+
+    detail::ColorData fg_data_ = {0, 0, 0};
+    detail::ColorData bg_data_ = {0, 0, 0};
+
+    // Bit-packed color types for fg and bg.
+    // fg uses the upper 4 bits and bg uses the lower 4 bits.
+    uint8_t color_types_ = 0;
+
+    uint8_t emphasis_ = None;
+};
+
+/// @brief A Style wrapper that represents an absolute style.
+/// @details
+/// Style output normally has *additive semantics*, but this does't have.
+///
+/// Example for `std::cout`:
+/// ```cpp
+/// std::cout << italic << bold; // current style: italic | bold
+/// std::cout << reset;
+/// std::cout << italic << abs(bold); // current style: bold
+/// ```
+struct AbsoluteStyle {
+    static constexpr std::size_t MAX_ESCAPE_SEQ_SIZE =
+        Style::MAX_ESCAPE_SEQ_SIZE + 1;
+
+    constexpr explicit AbsoluteStyle(Style style = Style()) : style_(style) {}
+
+    constexpr auto operator==(const AbsoluteStyle&) const -> bool = default;
+    constexpr auto operator!=(const AbsoluteStyle&) const -> bool = default;
+
+    constexpr auto inner() const -> Style { return style_; }
+
+    /// This is always `false` since `to_escape()` will never be empty.
+    constexpr auto is_null() const -> bool { return false; }
+
+    /// Writes ANSI escape sequence to the output iterator.
+    template <std::output_iterator<const char&> OutputIt>
+    constexpr auto to_escape(OutputIt out) const -> OutputIt {
+        out = detail::write_to(out, "\x1b[");
+        if (style_) *out++ = ';';
+        out = style_.to_sgr_params(out);
+        *out++ = 'm';
+        return out;
+    }
+
+    /// Writes ANSI escape sequence to a string.
+    [[nodiscard]] auto to_escape() const -> std::string {
+        std::string esc;
+        this->to_escape(std::back_inserter(esc));
+        return esc;
+    }
+
+    [[nodiscard]] auto debug_string() const -> std::string {
+        return std::string("[absolute:") + style_.debug_string() + "]";
+    }
+
+  private:
+    Style style_;
+};
+
+/// @brief Creates an AbsoluteStyle from a Style.
+/// @details equivalent to `AbsoluteStyle(style)`
+constexpr auto abs(Style style) -> AbsoluteStyle {
+    return AbsoluteStyle(style);
+}
+
+/// Creates a Style with foreground and background colors.
+constexpr auto color(Color fg, Color bg) -> Style {
+    return Style(Style::Emphasis::None, fg, bg);
+}
+
+/// Create a Style with foreground color.
+constexpr auto fg(Color fg) -> Style {
+    return Style(Style::Emphasis::None, fg);
+}
+
+/// Create a Style with background color.
+constexpr auto bg(Color bg) -> Style {
+    return Style(Style::Emphasis::None, null_color, bg);
+}
+
+/// IO manipulator that resets the terminal style.
+struct Reset {};
+inline constexpr Reset reset;
+
+/// output operator for `Style`
+inline auto operator<<(std::ostream& os, Style style) -> std::ostream& {
+    std::array<char, Style::MAX_ESCAPE_SEQ_SIZE> buf = {0};
+    auto len = style.to_escape(buf.begin()) - buf.begin();
+    os.write(buf.begin(), len);
+    return os;
+}
+
+/// output operator for `AbsoluteStyle`
+inline auto operator<<(std::ostream& os, AbsoluteStyle abstyle)
+    -> std::ostream& {
+    std::array<char, AbsoluteStyle::MAX_ESCAPE_SEQ_SIZE> buf = {0};
+    auto len = abstyle.to_escape(buf.begin()) - buf.begin();
+    os.write(buf.begin(), len);
+    return os;
+}
+
+/// output operator for deco::reset
+inline auto operator<<(std::ostream& os, Reset) -> std::ostream& {
+    std::array<char, Style::MAX_ESCAPE_SEQ_SIZE> buf = {0};
+    auto len = abs(Style()).to_escape(buf.begin()) - buf.begin();
+    os.write(buf.begin(), len);
+    return os;
+}
+
+/* ----- style constants ----- */
+
+// clang-format off
+
+inline constexpr Style null_style        = Style();
+inline constexpr Style bold              = Style(Style::Emphasis::Bold);
+inline constexpr Style dim               = Style(Style::Emphasis::Dim);
+inline constexpr Style italic            = Style(Style::Emphasis::Italic);
+inline constexpr Style underline         = Style(Style::Emphasis::Underline);
+inline constexpr Style blink             = Style(Style::Emphasis::Blink);
+inline constexpr Style invert            = Style(Style::Emphasis::Invert);
+inline constexpr Style strikethrough     = Style(Style::Emphasis::Strikethrough);
+inline constexpr Style underline_double  = Style(Style::Emphasis::UnderlineDouble);
+
+// clang-format on
+
+// ╔═════════════════════════════════════════════════════════╗
+// ║                         styled                          ║
+// ╚═════════════════════════════════════════════════════════╝
+
+/// @brief Creates a styled wrapper of a value.
+/// @details
+/// `std::cout << styled(s, v)` is equivalent to
+/// `std::cout << s << v << deco::reset;`.
+///
+/// @return An implementation-defined object that associates `value` with
+/// `style`. Lvalues are stored by reference and rvalues are stored by value.
+template <typename T>
+constexpr auto styled(T&& value, Style style) {
+    return detail::Styled(detail::ValueOrRef(std::forward<T>(value)), style);
+}
+
+/// `AbsoluteStyle` version of `styled()`
+template <typename T>
+constexpr auto styled(T&& value, AbsoluteStyle abstyle) {
+    return detail::Styled(detail::ValueOrRef(std::forward<T>(value)), abstyle);
+}
+
+/// shorthand for `styled(value, style)`
+template <typename T>
+constexpr auto operator|(Style style, T&& value) {
+    return styled(std::forward<T>(value), style);
+}
+
+/// shorthand for `styled(value, abstyle)`
+template <typename T>
+constexpr auto operator|(AbsoluteStyle abstyle, T&& value) {
+    return styled(std::forward<T>(value), abstyle);
+}
+
+/// output operator for `styled()`
+template <detail::style_type StyleT, ostream_outputable T>
+inline auto operator<<(std::ostream& os,
+                       const detail::Styled<StyleT, T>& styled)
+    -> std::ostream& {
+    os << styled.style() << styled.value() << reset;
+    return os;
+}
+
+} // namespace deco
+
+#undef DECO_CONSTEXPR_CMATH
+
+#endif // !DECOTERM_STYLE_HPP
