@@ -15,6 +15,16 @@ src/  ← ソースコード
 
 ## コンパイル
 
+> [!WARNING]
+> Windowsでは`g++`, `mingw32-make`, `cmake` が必要です。
+>
+> ```
+> g++ --version
+> mingw32-make --version
+> cmake --version
+> ```
+> で確認してください。
+
 - Windowsでは
 
 ```powershell
