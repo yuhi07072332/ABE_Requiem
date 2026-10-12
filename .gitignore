@@ -1,7 +1,7 @@
-地図データ
 map_data
 *.out
 *.exe
 *.wrl
 *.dat
 genk
+build/

@@ -17,7 +17,7 @@ src/  ← ソースコード
 
 - Windowsでは
 
-```bat
+```powershell
 ./build.bat
 ```
 

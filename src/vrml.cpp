@@ -51,8 +51,6 @@ void generate_points(const MapData& data, std::string_view out_filename) {
     std::print(ofs, FMT2);
 }
 
-/// @brief 点群に対しドロネーの三角形分割を実行し、IndexFacedSetとして出力
-/// @returns 三角形の面数
 int write_delaunay_triangulation(const std::vector<Point>& pts,
                                  std::ostream& os) {
     constexpr std::string_view FMT1 = 

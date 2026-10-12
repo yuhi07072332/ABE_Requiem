@@ -1,1 +1,4 @@
-g++ -std=c++23 -lstdc++exp -Wall -Wextra -Wno-reorder -Wno-unused-but-set-variable -o genk src/main.cpp src/algorithm.cpp src/vrml.cpp src/input.cpp
+if not exist "build\" (
+    cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_CXX_COMPILER=g++
+)
+cmake --build build
