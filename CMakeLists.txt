@@ -12,9 +12,8 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
 
 add_executable(genk ${SOURCES})
 
-target_compile_features(genk PRIVATE cxx_std_23)
-
 target_compile_options(genk PRIVATE
+    -std=c++23
     -Wall
     -Wextra
     -Wno-reorder
@@ -22,7 +21,5 @@ target_compile_options(genk PRIVATE
 )
 
 if(WIN32)
-    target_compile_options(genk PRIVATE
-        -lstdc++exp 
-    )
+    target_link_libraries(genk PRIVATE stdc++exp)
 endif()

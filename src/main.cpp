@@ -9,7 +9,7 @@
 #include <format>
 
 #include "third_party/argparse.hpp"
-#include "third_party/decoterm/format.hpp"
+#include "third_party/decoterm/format.hpp" // IWYU pragma: keep
 
 #include "genk.hpp"
 
@@ -26,7 +26,7 @@ void report_heights(const std::vector<double>& heights) {
 }
 
 void test_ground(const MapData& data, std::string_view out_filename) {
-    deco::println(deco::bold | deco::fg(deco::yellow), "地面判定中...");
+    std::println("{}", deco::bold | deco::fg(deco::yellow) | "地面判定中...");
     auto ground_points = find_ground(data);
     std::println("マップ内点群数: {}", data.grid.size());
     std::println("地面判定した点群数: {} (~{}%)",
@@ -56,19 +56,19 @@ void print_help() {
         {"gen-points", "地図データから点群を直接出力"}
     };
 
-    deco::println(title_s, "使い方\n");
+    std::println("{}", title_s | "使い方\n");
     std::println("./genk {} {} {}",
                  deco::dim | "[オプション...]",
                  placeholder_s | "<コマンド>",
                  placeholder_s | "<地図データファイル>");
     std::println();
 
-    deco::println(title_s, "コマンド\n");
+    std::println("{}", title_s | "コマンド\n");
     for (auto [name, desc] : COMMANDS)
         std::println("{}\t\t{}", highlight_s | name, desc);
     std::println();
 
-    deco::println(title_s, "オプション\n");
+    std::println("{}", title_s | "オプション\n");
     std::println("{}\t\t出力ファイル名を指定",
                  highlight_s | "-o <ファイル名>");
 }
