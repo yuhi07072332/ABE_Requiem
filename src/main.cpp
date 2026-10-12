@@ -1,4 +1,4 @@
-#include <cassert>
+#include <cstdlib>
 #include <exception>
 #include <fstream>
 #include <print>
@@ -13,54 +13,10 @@
 
 #include "genk.hpp"
 
-enum class Command {
-    ReportHeights,
-    GeneratePoints,
-    TestGround,
-};
-
-struct Option : argparse::Args {
-    std::string& command = arg("コマンド");
-    std::string& file_path = arg("入力ファイル");
-    std::string& output_filename = kwarg("o", "").set_default("out.wrl");
-
-    void help() override {
-        const deco::Style placeholder_s = deco::fg(deco::bright_yellow);
-        const deco::Style title_s = deco::bold | deco::underline;
-        const deco::Style highlight_s = deco::bold | deco::fg(deco::bright_blue);
-
-        deco::println(title_s, "使い方\n");
-        std::println("./genk {} {} {}",
-                     deco::dim | "[オプション...]",
-                     placeholder_s | "<コマンド>",
-                     placeholder_s | "<地図データファイル>");
-        std::println();
-
-        deco::println(title_s, "コマンド\n");
-
-        std::println("{}\t\t点群の高さの度数分布表を表示",
-                     highlight_s | "report-heights");
-        std::println("{}\t\t地面判定アルゴリズムをテスト",
-                     highlight_s | "test-ground");
-        std::println("{}\t\t地図データから点群を直接出力",
-                     highlight_s | "gen-points");
-        std::println();
-
-        deco::println(title_s, "オプション\n");
-        std::println("{}\t\t出力ファイル名を指定",
-                     highlight_s | "-o <ファイル名>");
-    }
-
-    Command parse_command() const {
-        if (command == "report-heights") return Command::ReportHeights;
-        if (command == "gen-points") return Command::GeneratePoints;
-        if (command == "test-ground") return Command::TestGround;
-        throw std::runtime_error(std::format("未知なコマンド名: {}", command));
-    }
-
-    void normalize_output_filename() const {
-        if (!output_filename.ends_with(".wrl")) output_filename.append(".wrl");
-    }
+struct Option {
+    std::string command;
+    std::string file_path;
+    std::string output_filename;
 };
 
 void report_heights(const std::vector<double>& heights) {
@@ -87,36 +43,85 @@ void test_ground(const MapData& data, std::string_view out_filename) {
                      | (ground_points.size() + triangles));
 }
 
+/// ヘルプメッセージを出力
+void print_help() {
+    const deco::Style placeholder_s = deco::fg(deco::bright_yellow);
+    const deco::Style title_s = deco::bold | deco::underline;
+    const deco::Style highlight_s = deco::bold | deco::fg(deco::bright_blue);
+
+    /// コマンド一覧
+    const std::vector<std::pair<std::string_view, std::string_view>> COMMANDS = {
+        {"report-heights", "点群の高さの度数分布表を表示"},
+        {"test-ground", "地面判定アルゴリズムをテスト"},
+        {"gen-points", "地図データから点群を直接出力"}
+    };
+
+    deco::println(title_s, "使い方\n");
+    std::println("./genk {} {} {}",
+                 deco::dim | "[オプション...]",
+                 placeholder_s | "<コマンド>",
+                 placeholder_s | "<地図データファイル>");
+    std::println();
+
+    deco::println(title_s, "コマンド\n");
+    for (auto [name, desc] : COMMANDS)
+        std::println("{}\t\t{}", highlight_s | name, desc);
+    std::println();
+
+    deco::println(title_s, "オプション\n");
+    std::println("{}\t\t出力ファイル名を指定",
+                 highlight_s | "-o <ファイル名>");
+}
 
 int main(int argc, const char** argv) {
     Option opt;
-    Command command;
+    argparse::ArgumentParser parser("genk", "0.1", argparse::default_arguments::none);
+
+    parser.add_argument("command")
+        .help("コマンド")
+        .store_into(opt.command);
+
+    parser.add_argument("file-path")
+        .help("地図データファイル")
+        .store_into(opt.file_path);
+
+    parser.add_argument("-h", "--help")
+        .flag()
+        .help("ヘルプメッセージを出力")
+        .action([](const auto&){
+            print_help();
+            std::exit(0);
+        });
+
+    parser.add_argument("-o")
+        .help("出力ファイル名を指定")
+        .default_value("out.wrl")
+        .store_into(opt.output_filename)
+        .action([&](const std::string& filename){
+            if (!filename.ends_with(".wrl")) {
+                opt.output_filename = filename + ".wrl";
+            }
+        });
+
     try {
-        opt.parse(argc, argv, true);
-        opt.normalize_output_filename();
-        command = opt.parse_command();
+        parser.parse_args(argc, argv);
     } catch (const std::runtime_error& e) {
         std::println(stderr,
                      "{} {}\n",
                      deco::bold | deco::fg(deco::bright_red) | "エラー: ",
                      e.what());
-        opt.help();
+        print_help();
         return 1;
     }
 
     try {
         auto data = read_map(opt.file_path.c_str());
-        switch (command) {
-            case Command::ReportHeights:
-                report_heights(data.grid);
-                break;
-            case Command::GeneratePoints:
-                generate_points(data, opt.output_filename);
-                break;
-            case Command::TestGround:
-                test_ground(data, opt.output_filename);
-                break;
-        }
+
+        if (opt.command == "report-heights") report_heights(data.grid);
+        else if (opt.command == "test-ground") test_ground(data, opt.output_filename);
+        else if (opt.command == "gen-points") generate_points(data, opt.output_filename);
+        else throw std::runtime_error(std::format("コマンドが見つかりません: {}", opt.command));
+
     } catch (const std::exception& e) {
         std::println(stderr,
                      "{} {}\n",
