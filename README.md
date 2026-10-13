@@ -25,6 +25,10 @@ src/  ← ソースコード
 > ```
 >
 > で確認してください。
+> `cmake`をインストールするには:
+> ```sh
+> winget install CMake
+> ```
 
 - Windowsでは
 
