@@ -49,6 +49,11 @@ BoundingBox read_points(const char* data_path) {
     return {std::move(pts), min_x, min_z, max_x, max_z};
 }
 
+/// @brief 地図データから点群を読み込み、`MapData`を作成
+///
+/// @details
+/// この関数は`read_points()`から点群を読み込み、さらに2次元配列になる
+/// ように点群の欠損点を補う(補間は行わない, すなわち欠損点としてdataに格納)
 MapData read_map(std::string_view data_path) {
     auto [pts, min_x, min_z, max_x, max_z] = read_points(data_path.data());
     const int rows = max_z - min_z + 1;

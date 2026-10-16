@@ -78,23 +78,19 @@ int main(int argc, const char** argv) {
     argparse::ArgumentParser parser("genk", "0.1", argparse::default_arguments::none);
 
     parser.add_argument("command")
-        .help("コマンド")
         .store_into(opt.command);
 
     parser.add_argument("file-path")
-        .help("地図データファイル")
         .store_into(opt.file_path);
 
     parser.add_argument("-h", "--help")
         .flag()
-        .help("ヘルプメッセージを出力")
         .action([](const auto&){
             print_help();
             std::exit(0);
         });
 
     parser.add_argument("-o")
-        .help("出力ファイル名を指定")
         .default_value("out.wrl")
         .store_into(opt.output_filename)
         .action([&](const std::string& filename){
@@ -114,7 +110,10 @@ int main(int argc, const char** argv) {
         return 1;
     }
 
+    // ───────────────── ここで指定されたコマンドを実行する ──────────────
+
     try {
+
         auto data = read_map(opt.file_path.c_str());
 
         if (opt.command == "report-heights") report_heights(data.grid);

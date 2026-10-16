@@ -22,6 +22,8 @@ std::pair<int, int> max2(const std::map<int, int>& data) {
     return {first_key, second_key};
 }
 
+/// @brief 高さの度数分布を計算する
+/// @returns keyを階級の下限値, valueを度数とするmap
 std::map<int, int> calc_frequency(const std::vector<double>& heights,
                                   int width) {
     std::map<int, int> freq;
@@ -36,6 +38,20 @@ std::map<int, int> calc_frequency(const std::vector<double>& heights,
     return freq;
 }
 
+/// @brief 地面と判定された点群を返す
+/// @details
+/// 暫定のアルゴリズム:
+/// * 高さの度数が最も高い2つの階級(の下限値)を地面高さの候補とし、高さがそれ
+///   より低い階級も地面の候補とする
+/// * マップを16 * 16のチャンクに分けて、チャンクごとに：
+///     - チャンク内の最も低い高さが地面の候補にあれば、チャンク内でそれを地面
+///       の高さの基準とする
+///     - 基準よりNメートル高ければ地面以外と判定する
+///
+/// 可能な問題点:
+/// * 斜めの地面を建物に誤判定することがある
+/// * 逆に建物が地面に誤判定することがある
+/// * チャンク間のつなぎがあまり綺麗じゃないことがある
 std::vector<Point> find_ground(const MapData& data) {
     constexpr int N = 2;
     constexpr int CHUNK_WIDTH = 16;
