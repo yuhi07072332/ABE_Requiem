@@ -1,8 +1,9 @@
+#include <string_view>
 #include <vector>
 #include <print>
+#include <exception>
 #include <utility>
 #include <string>
-#include <optional>
 
 #include "third_party/decoterm/format.hpp" // IWYU pragma: keep
 #include "third_party/argparse.hpp"
@@ -44,7 +45,14 @@ static void print_help() {
                  highlight_s | "-h, --help");
 }
 
-std::optional<Option> parse_args(int argc, const char** argv) {
+static void print_error(std::string_view msg) {
+    std::println(stderr,
+                 "{} {}\n",
+                 deco::bold | deco::fg(deco::bright_red) | "エラー: ",
+                 msg);
+}
+
+Option parse_args(int argc, const char** argv) {
     Option opt;
     argparse::ArgumentParser parser("genk", "0.1", argparse::default_arguments::none);
 
@@ -77,12 +85,9 @@ std::optional<Option> parse_args(int argc, const char** argv) {
     try {
         parser.parse_args(argc, argv);
     } catch (const std::runtime_error& e) {
-        std::println(stderr,
-                     "{} {}\n",
-                     deco::bold | deco::fg(deco::bright_red) | "エラー: ",
-                     e.what());
+        print_error(e.what());
         print_help();
-        return std::nullopt;
+        throw std::exception();
     }
 
     return opt;
@@ -95,9 +100,16 @@ void add_command(std::string name, std::string desc, CommandAction action) {
 void run_command(const Option& opt) {
     for (const auto& command : commands) {
         if (command.name == selected_command) {
-            command.action(opt);
+            try {
+                command.action(opt);
+            } catch (const std::exception& e) {
+                print_error(e.what());
+                throw std::exception();
+            }
             return;
         }
     }
-    throw std::runtime_error(std::string("コマンド '" + selected_command + "' が見つかりません"));
+    print_error(std::string("コマンド '" + selected_command + "' が見つかりません"));
+    print_help();
+    throw std::exception();
 }

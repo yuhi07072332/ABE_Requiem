@@ -69,29 +69,23 @@ void test(const Option& opt) {
 // └                                                         ┘
 
 int main(int argc, const char** argv) {
-    // コマンドを定義
-    add_command("report-heights", "点群の高さの度数分布表を表示", report_heights);
-    add_command("test-ground", "地面判定アルゴリズムをテスト", test_ground);
-    add_command("gen-points", "地図データから点群を直接出力", gen_points);
-
-    add_command("test", "テスト用コマンド", test);
-
-    // argvを解析し、結果を`opt`に保存(失敗した場合はプログラムを終了)
-    Option opt;
-    if (auto res = parse_args(argc, argv)) opt = *res;
-    else return 1;
-
-    // 指定されたコマンド実行
     try {
+        // コマンドを定義
+        add_command("report-heights", "点群の高さの度数分布表を表示", report_heights);
+        add_command("test-ground", "地面判定アルゴリズムをテスト", test_ground);
+        add_command("gen-points", "地図データから点群を直接出力", gen_points);
+
+        add_command("test", "テスト用コマンド", test);
+
+        // argvを解析し、結果を`opt`に保存(失敗した場合はプログラムを終了)
+        Option opt = parse_args(argc, argv);
+
+        // 指定されたコマンド実行
         run_command(opt);
-    } catch (const std::exception& e) {
-        // エラーが発生した場合、エラーメッセージを出力
-        std::println(stderr,
-                     "{} {}\n",
-                     deco::bold | deco::fg(deco::bright_red) | "エラー: ",
-                     e.what());
+
+    } catch(const std::exception& e) {
+        // エラーが出た場合、プログラムをエラー終了させる
         return 1;
     }
-
     return 0;
 }

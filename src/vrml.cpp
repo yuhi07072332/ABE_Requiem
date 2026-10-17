@@ -9,7 +9,7 @@
 #include "genk.hpp"
 
 /// 点群をElevationGridで出力
-void write_elevation_grid(const MapData& data, std::ostream& os) {
+void write_elevation_grid(std::ostream& os, const MapData& data) {
     std::println(os, VRML_HEADER);
 
     constexpr std::string_view FMT1 = R"(
