@@ -54,13 +54,15 @@ Shape {{
 
 /// @brief 点群に対しドロネーの三角形分割を実行し、IndexFacedSetとして出力
 /// @returns 三角形の面数
-int write_delaunay_triangulation(const std::vector<Point>& pts,
-                                 std::ostream& os) {
+
+int write_delaunay_triangulation(std::ostream& os,
+                                 const std::vector<Point>& pts,
+                                 std::string_view diffuse_color) {
     constexpr std::string_view FMT1 = R"(
 Shape {{
     appearance Appearance {{
         material Material {{
-            diffuseColor 0.3 0.5 0.7
+            diffuseColor {0}
         }}
     }}
     geometry IndexedFaceSet {{
@@ -89,7 +91,7 @@ Shape {{
 
     delaunator::Delaunator d(coords);
 
-    std::print(os, FMT1);
+    std::print(os, FMT1, diffuse_color);
 
     for (Point p : pts) {
         std::println(os, "{} {} {},", p.x, p.y, p.z);

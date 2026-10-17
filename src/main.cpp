@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <format>
+#include <ios>
 
 #include "third_party/decoterm/format.hpp" // IWYU pragma: keep
 
@@ -11,6 +12,7 @@
 #include "genk.hpp"
 #include "third_party/decoterm/style.hpp"
 
+/// Optionに基づいて、`opt.output_file`をオープンする
 std::ofstream open_file(const Option& opt) {
     auto mode = std::ios_base::out;
     if (opt.append) mode |= std::ios_base::app;
@@ -41,7 +43,7 @@ void test_ground(const Option& opt) {
 
     std::ofstream ofs = open_file(opt);
     std::println(ofs, VRML_HEADER);
-    int triangles = write_delaunay_triangulation(ground_points, ofs);
+    int triangles = write_delaunay_triangulation(ofs, ground_points);
 
     std::println("面数(三角形数): {}", triangles);
     std::println("総データ量(点 + 面の数): {} (~{}%)",
@@ -54,7 +56,7 @@ void test_ground(const Option& opt) {
 void gen_points(const Option& opt) {
     MapData data = read_map(opt.input_file);
     std::ofstream ofs = open_file(opt);
-    write_elevation_grid(data, ofs);
+    write_elevation_grid(ofs, data);
     std::println("{} に出力しました", deco::fg(deco::bright_yellow) | opt.output_file);
 }
 
