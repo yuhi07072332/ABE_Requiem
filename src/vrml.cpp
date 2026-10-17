@@ -41,7 +41,7 @@ Shape {{
     for (int z = 0; z < data.rows; ++z) {
         for (int x = 0; x < data.cols; ++x) {
             if (data.is_missing(z, x)) std::print(os, "100, ");
-            else std::print(os, "{}, ", data[z, x]);
+            else std::print(os, "{}, ", data.at(z, x));
             if (count++ == 50) {
                 count = 0;
                 std::println(os);
@@ -86,7 +86,7 @@ Shape {{
     std::vector<double> coords_vec;
     coords_vec.reserve(coords.size() * 2);
     for (Coord c : coords) {
-        Point p = data.point_at(c.i, c.j);
+        Point p = data.point_at(c);
         coords_vec.push_back(p.x);
         coords_vec.push_back(p.z);
     }
@@ -96,7 +96,7 @@ Shape {{
     std::print(os, FMT1, diffuse_color);
 
     for (Coord c : coords) {
-        Point p = data.point_at(c.i, c.j);
+        Point p = data.point_at(c);
         std::println(os, "{} {} {},", p.x, p.y, p.z);
     }
 

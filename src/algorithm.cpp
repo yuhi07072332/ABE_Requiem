@@ -73,7 +73,7 @@ std::vector<Coord> find_ground(const MapData& data) {
         for (int i = i_begin; i < i_begin + CHUNK_HEIGHT; ++i) {
             for (int j = j_begin; j < j_begin + CHUNK_WIDTH; ++j) {
                 if (data.is_missing(i, j)) continue;
-                if (data[i, j] < min_height) min_height = data[i, j];
+                if (data.at(i, j) < min_height) min_height = data.at(i, j);
             }
         }
 
@@ -81,7 +81,7 @@ std::vector<Coord> find_ground(const MapData& data) {
 
         for (int i = i_begin; i < i_begin + CHUNK_HEIGHT; ++i) {
             for (int j = j_begin; j < j_begin + CHUNK_WIDTH; ++j) {
-                double height = data[i, j];
+                double height = data.at(i, j);
                 if (height < min_height + N) ground_coords.emplace_back(i, j);
             }
         }

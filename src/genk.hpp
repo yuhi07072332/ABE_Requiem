@@ -5,6 +5,7 @@
 #include <string_view>
 #include <cmath>
 #include <iosfwd>
+#include <cstdint>
 
 struct Point {
     int x, z;
@@ -16,15 +17,23 @@ struct Coord {
     int i, j;
 };
 
+// 点の種類
+enum class Type : uint8_t {
+    Unknown,                // 未知
+    Ground,                 // 地面
+    Building,               // 建物
+    BuildingOutline,        // 建物(輪郭)
+};
+
 /// @brief 地図から読み込んだデータ
 ///
 /// @details
 /// * x座標を列、z座標を行とした行列でマップ内の点群を表す
-/// * 各要素にはy座標値を格納している
+/// * 各要素にはy座標値と点の種類(`Type`)を格納している
 /// * 行と列は0から始まる
-/// * 欠損点のy座標値はNaNとし、is_missing()で判定できる
 struct MapData {
     std::vector<double> grid;
+    std::vector<Type> types;
 
     int x, z; // 地図の左下の座標
 
@@ -32,18 +41,24 @@ struct MapData {
     int cols; // 列数(x軸方向の長さ)
 
     /// i行j列のz座標を取得
-    double operator[](int i, int j) const { return grid.at(i * cols + j); }
-    double& operator[](int i, int j) { return grid.at(i * cols + j); }
     double at(int i, int j) const { return grid.at(i * cols + j); }
-    double& at(int i, int j) { return grid.at(i * cols + j); }
+    double at(Coord c) const { return grid.at(c.i * cols + c.j); }
 
     /// i行j列に対応するPointを取得
     Point point_at(int i, int j) const {
         return Point {x + j, z + i, at(i, j)};
     }
+    Point point_at(Coord c) const { return point_at(c.i, c.j); }
+
+    /// i行j列のTypeを取得
+    Type type_at(int i, int j) const { return types.at(i * cols + j); }
+    Type type_at(Coord c) const { return types.at(c.i * cols + c.j); }
+    Type& type_at(int i, int j) { return types.at(i * cols + j); }
+    Type& type_at(Coord c) { return types.at(c.i * cols + c.j); }
 
     /// i行j列の点が欠損点かどうかを判定
     bool is_missing(int i, int j) const { return std::isnan(at(i, j)); }
+    bool is_missing(Coord c) const { return is_missing(c.i, c.j); }
 };
 
 /* ----- algorithm ----- */

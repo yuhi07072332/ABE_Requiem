@@ -73,6 +73,7 @@ MapData read_map(std::string_view data_path) {
 
     return MapData {
         .grid = std::move(grid),
+        .types = std::vector(rows * cols, Type::Unknown),
         .x = min_x,
         .z = min_z,
         .rows = rows,
