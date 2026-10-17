@@ -4,6 +4,8 @@
 #include <exception>
 #include <utility>
 #include <string>
+#include <fstream>
+#include <ios>
 
 #include "third_party/decoterm/format.hpp" // IWYU pragma: keep
 #include "third_party/argparse.hpp"
@@ -112,4 +114,10 @@ void run_command(const Option& opt) {
     print_error(std::string("コマンド '" + selected_command + "' が見つかりません"));
     print_help();
     throw std::exception();
+}
+
+std::ofstream open_file(const Option& opt) {
+    auto mode = std::ios_base::out;
+    if (opt.append) mode |= std::ios_base::app;
+    return std::ofstream(opt.output_file, mode);
 }

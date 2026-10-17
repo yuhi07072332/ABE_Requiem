@@ -4,20 +4,12 @@
 #include <string>
 #include <vector>
 #include <format>
-#include <ios>
 
 #include "third_party/decoterm/format.hpp" // IWYU pragma: keep
 
 #include "cli.hpp"
 #include "genk.hpp"
 #include "third_party/decoterm/style.hpp"
-
-/// Optionに基づいて、`opt.output_file`をオープンする
-std::ofstream open_file(const Option& opt) {
-    auto mode = std::ios_base::out;
-    if (opt.append) mode |= std::ios_base::app;
-    return std::ofstream(opt.output_file, mode);
-}
 
 // ┌                                                         ┐
 // │                        コマンド                         │
@@ -77,7 +69,7 @@ int main(int argc, const char** argv) {
 
         add_command("test", "テスト用コマンド", test);
 
-        // argvを解析し、結果を`opt`に保存(失敗した場合はプログラムを終了)
+        // argvを解析し、結果を`opt`に保存
         Option opt = parse_args(argc, argv);
 
         // 指定されたコマンド実行
