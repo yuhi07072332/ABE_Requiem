@@ -5,6 +5,7 @@
 #include <string_view>
 #include <cmath>
 #include <iosfwd>
+#include <string>
 
 struct Point {
     int x, z;
@@ -50,9 +51,13 @@ std::vector<Point> find_ground(const MapData& data);
 
 /* ----- vrml ----- */
 
+struct Appearance {
+    std::string diffuse_color = "0.3 0.5 0.7";
+};
+
 inline constexpr std::string_view VRML_HEADER = "#VRML V2.0 utf8";
 
-void generate_points(const MapData& data, std::string_view out_filename);
+void write_elevation_grid(const MapData& data, std::ostream& os);
 int write_delaunay_triangulation(const std::vector<Point>& pts,
                                  std::ostream& os);
 

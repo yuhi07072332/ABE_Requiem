@@ -7,7 +7,7 @@
 #include "genk.hpp"
 
 /// @brief 度数が2番目まで最大なkeyを返す
-std::pair<int, int> max2(const std::map<int, int>& data) {
+static std::pair<int, int> max2(const std::map<int, int>& data) {
     int first_key = 0, second_key = 0;
 
     for (auto [key, value] : data) {

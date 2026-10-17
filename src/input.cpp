@@ -20,7 +20,7 @@ struct BoundingBox {
 /// @returns 点群配列、x座標, y座標の最大値及び最小値
 /// @throws
 /// ファイルが開けない場合や読み込み失敗した場合はruntime_errorを投げる
-BoundingBox read_points(const char* data_path) {
+static BoundingBox read_points(const char* data_path) {
     std::ifstream ifs(data_path);
     if (!ifs.is_open())
         throw std::runtime_error("read_points(): ファイルを開けませんでした");
