@@ -11,6 +11,11 @@ struct Point {
     double y;
 };
 
+/// 行列内の位置を表す
+struct Coord {
+    int i, j;
+};
+
 /// @brief 地図から読み込んだデータ
 ///
 /// @details
@@ -45,7 +50,7 @@ struct MapData {
 
 std::map<int, int> calc_frequency(const std::vector<double>& heights,
                                   int width = 5);
-std::vector<Point> find_ground(const MapData& data);
+std::vector<Coord> find_ground(const MapData& data);
 
 
 /* ----- vrml ----- */
@@ -54,7 +59,8 @@ inline constexpr std::string_view VRML_HEADER = "#VRML V2.0 utf8";
 
 void write_elevation_grid(std::ostream& os, const MapData& data);
 int write_delaunay_triangulation(std::ostream& os,
-                                 const std::vector<Point>& pts,
+                                 const std::vector<Coord>& coords,
+                                 const MapData& data,
                                  std::string_view diffuse_color = "0.3 0.5 0.7");
 
 /* ----- input ----- */

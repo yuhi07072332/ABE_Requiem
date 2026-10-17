@@ -56,7 +56,8 @@ Shape {{
 /// @returns 三角形の面数
 
 int write_delaunay_triangulation(std::ostream& os,
-                                 const std::vector<Point>& pts,
+                                 const std::vector<Coord>& coords,
+                                 const MapData& data,
                                  std::string_view diffuse_color) {
     constexpr std::string_view FMT1 = R"(
 Shape {{
@@ -82,18 +83,20 @@ Shape {{
 }}
 )";
 
-    std::vector<double> coords;
-    coords.reserve(pts.size() * 2);
-    for (const Point& p : pts) {
-        coords.push_back(p.x);
-        coords.push_back(p.z);
+    std::vector<double> coords_vec;
+    coords_vec.reserve(coords.size() * 2);
+    for (Coord c : coords) {
+        Point p = data.point_at(c.i, c.j);
+        coords_vec.push_back(p.x);
+        coords_vec.push_back(p.z);
     }
 
-    delaunator::Delaunator d(coords);
+    delaunator::Delaunator d(coords_vec);
 
     std::print(os, FMT1, diffuse_color);
 
-    for (Point p : pts) {
+    for (Coord c : coords) {
+        Point p = data.point_at(c.i, c.j);
         std::println(os, "{} {} {},", p.x, p.y, p.z);
     }
 

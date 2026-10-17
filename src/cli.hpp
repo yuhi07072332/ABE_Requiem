@@ -15,4 +15,5 @@ Option parse_args(int argc, const char** argv);
 void add_command(std::string name, std::string desc, CommandAction action);
 void run_command(const Option& opt);
 
-std::ofstream open_file(const Option& opt);
+/// `output_file`をオープンし、`ofstream`を返す
+std::ofstream open_output_file(const Option& opt);

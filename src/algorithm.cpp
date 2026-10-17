@@ -52,7 +52,7 @@ std::map<int, int> calc_frequency(const std::vector<double>& heights,
 /// * 斜めの地面を建物に誤判定することがある
 /// * 逆に建物が地面に誤判定することがある
 /// * チャンク間のつなぎがあまり綺麗じゃないことがある
-std::vector<Point> find_ground(const MapData& data) {
+std::vector<Coord> find_ground(const MapData& data) {
     constexpr int N = 2;
     constexpr int CHUNK_WIDTH = 16;
     constexpr int CHUNK_HEIGHT = 16;
@@ -65,7 +65,7 @@ std::vector<Point> find_ground(const MapData& data) {
         std::max(freq_max2.first, freq_max2.second);
     std::println("地面基準: {}", ground_candidate_height);
 
-    std::vector<Point> ground_points;
+    std::vector<Coord> ground_coords;
 
     auto process_chunk = [&](int i_begin, int j_begin) -> void {
         // チャンク内高さが一番低い点を探す
@@ -81,8 +81,8 @@ std::vector<Point> find_ground(const MapData& data) {
 
         for (int i = i_begin; i < i_begin + CHUNK_HEIGHT; ++i) {
             for (int j = j_begin; j < j_begin + CHUNK_WIDTH; ++j) {
-                Point p = data.point_at(i, j);
-                if (p.y < min_height + N) ground_points.push_back(p);
+                double height = data[i, j];
+                if (height < min_height + N) ground_coords.emplace_back(i, j);
             }
         }
     };
@@ -99,5 +99,5 @@ std::vector<Point> find_ground(const MapData& data) {
         }
     }
 
-    return ground_points;
+    return ground_coords;
 }

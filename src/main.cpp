@@ -27,27 +27,27 @@ void test_ground(const Option& opt) {
     MapData data = read_map(opt.input_file);
 
     std::println("{}", deco::bold | deco::fg(deco::yellow) | "地面判定中...");
-    auto ground_points = find_ground(data);
+    auto ground_coords = find_ground(data);
     std::println("マップ内点群数: {}", data.grid.size());
     std::println("地面判定した点群数: {} (~{}%)",
-                 ground_points.size(),
-                 ground_points.size() * 100 / data.grid.size());
+                 ground_coords.size(),
+                 ground_coords.size() * 100 / data.grid.size());
 
-    std::ofstream ofs = open_file(opt);
+    std::ofstream ofs = open_output_file(opt);
     std::println(ofs, VRML_HEADER);
-    int triangles = write_delaunay_triangulation(ofs, ground_points);
+    int triangles = write_delaunay_triangulation(ofs, ground_coords, data);
 
     std::println("面数(三角形数): {}", triangles);
     std::println("総データ量(点 + 面の数): {} (~{}%)",
                  deco::bold | deco::fg(deco::bright_yellow)
-                 | (ground_points.size() + triangles),
-                 (ground_points.size() + triangles) * 100 / data.grid.size());
+                 | (ground_coords.size() + triangles),
+                 (ground_coords.size() + triangles) * 100 / data.grid.size());
     std::println("{} に出力しました", deco::fg(deco::bright_yellow) | opt.output_file);
 }
 
 void gen_points(const Option& opt) {
     MapData data = read_map(opt.input_file);
-    std::ofstream ofs = open_file(opt);
+    std::ofstream ofs = open_output_file(opt);
     write_elevation_grid(ofs, data);
     std::println("{} に出力しました", deco::fg(deco::bright_yellow) | opt.output_file);
 }
@@ -62,21 +62,19 @@ void test(const Option& opt) {
 
 int main(int argc, const char** argv) {
     try {
-        // コマンドを定義
+        // コマンドを登録
         add_command("report-heights", "点群の高さの度数分布表を表示", report_heights);
         add_command("test-ground", "地面判定アルゴリズムをテスト", test_ground);
         add_command("gen-points", "地図データから点群を直接出力", gen_points);
 
         add_command("test", "テスト用コマンド", test);
 
-        // argvを解析し、結果を`opt`に保存
+        // コマンドライン引数(`argv`)を解析し、結果を`opt`に保存
         Option opt = parse_args(argc, argv);
 
         // 指定されたコマンド実行
         run_command(opt);
-
     } catch(const std::exception& e) {
-        // エラーが出た場合、プログラムをエラー終了させる
         return 1;
     }
     return 0;

@@ -31,12 +31,12 @@ static void print_help() {
                  deco::dim | "[オプション...]",
                  placeholder_s | "<コマンド>",
                  placeholder_s | "<地図データファイル>");
-    std::println();
+    std::println("");
 
     std::println("{}", title_s | "コマンド\n");
     for (const auto& [name, desc, _] : commands)
         std::println("{:8}\t\t{}", highlight_s | name, desc);
-    std::println();
+    std::println("");
 
     std::println("{}", title_s | "オプション\n");
     std::println("{}\t\t出力ファイル名を指定(デフォルト: out.wrl)",
@@ -62,6 +62,7 @@ Option parse_args(int argc, const char** argv) {
         .store_into(selected_command);
 
     parser.add_argument("file-path")
+        .default_value("")
         .store_into(opt.input_file);
 
     parser.add_argument("-h", "--help")
@@ -116,7 +117,7 @@ void run_command(const Option& opt) {
     throw std::exception();
 }
 
-std::ofstream open_file(const Option& opt) {
+std::ofstream open_output_file(const Option& opt) {
     auto mode = std::ios_base::out;
     if (opt.append) mode |= std::ios_base::app;
     return std::ofstream(opt.output_file, mode);
