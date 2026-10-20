@@ -1,15 +1,14 @@
 #include <exception>
+#include <format>
 #include <fstream>
 #include <print>
 #include <string>
 #include <vector>
-#include <format>
 
-#include "third_party/decoterm/format.hpp" // IWYU pragma: keep
+#include "third_party/decoterm.hpp"
 
 #include "cli.hpp"
 #include "genk.hpp"
-#include "third_party/decoterm/style.hpp"
 
 // ┌                                                         ┐
 // │                        コマンド                         │
@@ -20,13 +19,13 @@ void report_heights(const Option& opt) {
     auto freq = calc_frequency(data.grid);
     std::println("ファイル: {}", opt.input_file);
     for (auto [lower, frequency] : freq)
-    std::println("\"[{:>3}, {:>3}]\", {}", lower, lower + 5, frequency);
+        std::println("\"[{:>3}, {:>3}]\", {}", lower, lower + 5, frequency);
 }
 
 void test_ground(const Option& opt) {
     MapData data = read_map(opt.input_file);
 
-    std::println("{}", deco::bold | deco::fg(deco::yellow) | "地面判定中...");
+    std::println("{}", "地面判定中..." | deco::bold | deco::fg(deco::yellow));
     auto ground_coords = find_ground(data);
     std::println("マップ内点群数: {}", data.grid.size());
     std::println("地面判定した点群数: {} (~{}%)",
@@ -39,22 +38,22 @@ void test_ground(const Option& opt) {
 
     std::println("面数(三角形数): {}", triangles);
     std::println("総データ量(点 + 面の数): {} (~{}%)",
-                 deco::bold | deco::fg(deco::bright_yellow)
-                 | (ground_coords.size() + triangles),
+                 (ground_coords.size() + triangles) | deco::bold
+                     | deco::fg(deco::bright_yellow),
                  (ground_coords.size() + triangles) * 100 / data.grid.size());
-    std::println("{} に出力しました", deco::fg(deco::bright_yellow) | opt.output_file);
+    std::println("{} に出力しました",
+                 opt.output_file | deco::fg(deco::bright_yellow));
 }
 
 void gen_points(const Option& opt) {
     MapData data = read_map(opt.input_file);
     std::ofstream ofs = open_output_file(opt);
     write_elevation_grid(ofs, data);
-    std::println("{} に出力しました", deco::fg(deco::bright_yellow) | opt.output_file);
+    std::println("{} に出力しました",
+                 opt.output_file | deco::fg(deco::bright_yellow));
 }
 
-void test(const Option& opt) {
-    std::println("{}", opt.output_file);
-}
+void test(const Option& opt) { std::println("{}", opt.output_file); }
 
 // ┌                                                         ┐
 // │                          main                           │
@@ -63,7 +62,8 @@ void test(const Option& opt) {
 int main(int argc, const char** argv) {
     try {
         // コマンドを登録
-        add_command("report-heights", "点群の高さの度数分布表を表示", report_heights);
+        add_command(
+            "report-heights", "点群の高さの度数分布表を表示", report_heights);
         add_command("test-ground", "地面判定アルゴリズムをテスト", test_ground);
         add_command("gen-points", "地図データから点群を直接出力", gen_points);
 
@@ -74,7 +74,7 @@ int main(int argc, const char** argv) {
 
         // 指定されたコマンド実行
         run_command(opt);
-    } catch(const std::exception& e) {
+    } catch (const std::exception& e) {
         return 1;
     }
     return 0;

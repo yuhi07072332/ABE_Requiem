@@ -21,8 +21,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef DECOTERM_STYLE_HPP
-#define DECOTERM_STYLE_HPP
+#ifndef DECOTERM_DECO_HPP
+#define DECOTERM_DECO_HPP
 
 #include <array>
 #include <cassert>
@@ -31,19 +31,32 @@
 #include <concepts>
 #include <cstdint>
 #include <iterator>
-#include <memory>
 #include <ostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
-#include <utility>
 #include <version>
 
+#if __cplusplus < 202302L
+#   include <utility>
+#endif
+
+#if defined(__cpp_lib_format) && __cpp_lib_format >= 201907L                   \
+    && !defined(DECOTERM_NO_FORMAT)
+#   define DECOTERM_ENABLE_STD_FORMAT
+#   include <format>
+#endif
+
+#if defined(__cpp_lib_print) && __cpp_lib_print >= 202207L                     \
+    && defined(DECOTERM_ENABLE_STD_FORMAT)
+#   define DECOTERM_ENABLE_STD_PRINT
+#endif
+
 #if defined(__cpp_lib_constexpr_cmath) && __cpp_lib_constexpr_cmath >= 202202L
-#define DECO_CONSTEXPR_CMATH constexpr
+#   define DECO_CONSTEXPR_CMATH constexpr
 #else
-#define DECO_CONSTEXPR_CMATH
+#   define DECO_CONSTEXPR_CMATH
 #endif
 
 namespace deco {
@@ -63,6 +76,31 @@ template <typename T>
 concept ostream_outputable = requires(std::ostream& os, const T& value) {
     { os << value } -> std::same_as<std::ostream&>;
 };
+
+#ifdef DECOTERM_ENABLE_STD_FORMAT
+
+#if __cplusplus >= 202302L
+template <typename Arg, typename CharT = char>
+concept formattable = std::formattable<Arg, CharT>;
+#else
+// fallback for C++20. This only checks if `std::formatter<Arg>` exists
+// and has `parse()` and `format()`.
+template <typename Arg, typename CharT = char>
+concept formattable =
+    requires(std::formatter<std::remove_cvref_t<Arg>, CharT> formatter,
+             Arg&& arg,
+             std::basic_format_parse_context<CharT> parse_ctx,
+             std::basic_format_context<char*, CharT> fmt_ctx) {
+        {
+            formatter.parse(parse_ctx)
+        } -> std::same_as<typename decltype(parse_ctx)::iterator>;
+        {
+            formatter.format(std::forward<Arg>(arg), fmt_ctx)
+        } -> std::same_as<typename decltype(fmt_ctx)::iterator>;
+    };
+#endif
+
+#endif // DECOTERM_ENABLE_STD_FORMAT
 
 namespace detail {
 
@@ -87,7 +125,6 @@ concept style_type = (std::is_same_v<std::remove_cvref_t<S>, Style>
 // clang-format on
 
 using ColorData = std::array<uint8_t, 3>;
-
 
 // clang-format off
 inline constexpr std::array<std::string_view, 16> SGR_PARAM_FG {
@@ -167,60 +204,22 @@ constexpr auto color_to_sgr_params(OutputIt out, ColorType type, ColorData data)
         }
     }
     assert(false);
+    return out; // unreachable
 }
 
-/// A wrapper that stores rvalue or references lvalue.
-template <typename T>
-struct ValueOrRef {
-    explicit constexpr ValueOrRef(T value)
-        requires std::move_constructible<T>
-        : value(std::move(value)) {}
-
-    explicit constexpr ValueOrRef(const T& value)
-        requires(!std::move_constructible<T>
-                 && std::constructible_from<T, const T&>)
-        : value(value) {}
-
-    constexpr auto get() const -> T& { return value; }
-
-  private:
-    mutable T value;
-};
-
-template <typename T>
-struct ValueOrRef<T&> {
-    explicit constexpr ValueOrRef(T& ref) : ptr(std::addressof(ref)) {}
-
-    constexpr auto get() const -> T& { return *ptr; }
-
-  private:
-    mutable T* ptr;
-};
-
-template <typename T>
-    requires(!std::is_lvalue_reference_v<T>)
-ValueOrRef(T&& value) -> ValueOrRef<std::remove_cvref_t<T>>;
-
-template <typename T>
-ValueOrRef(T& ref) -> ValueOrRef<T&>;
-
-template <typename Ret, typename... Args>
-ValueOrRef(Ret(Args...)) -> ValueOrRef<std::decay_t<Ret(Args...)>>;
-
-/// A `ValueOrRef` with a style.
 template <style_type StyleT, typename T>
 struct Styled {
     using value_type = T;
 
-    constexpr Styled(ValueOrRef<T> value, StyleT style)
-        : store_(std::move(value)),
+    constexpr Styled(const T& value, StyleT style)
+        : value_(value),
           style_(style) {}
 
-    constexpr auto value() const -> T& { return store_.get(); }
+    constexpr auto value() const -> const T& { return value_; }
     constexpr auto style() const -> StyleT { return style_; }
 
   private:
-    ValueOrRef<T> store_;
+    const T& value_; // NOLINT
     StyleT style_;
 };
 
@@ -232,6 +231,25 @@ struct is_styled<Styled<S, T>> : std::true_type {};
 template <typename T>
 concept styled = is_styled<std::remove_cvref_t<T>>::value;
 
+#ifdef DECOTERM_ENABLE_STD_FORMAT
+
+// for `Styled` formatter
+template <typename T>
+struct formatter_type {
+    using type = std::formatter<T>;
+};
+
+template <typename Char, std::size_t N>
+    requires requires { std::formatter<std::basic_string_view<Char>, Char>(); }
+struct formatter_type<Char[N]> {
+    using type = std::formatter<std::basic_string_view<Char>, Char>;
+};
+
+template <typename T>
+using formatter_t = formatter_type<std::remove_cvref_t<T>>::type;
+
+#endif // DECOTERM_ENABLE_STD_FORMAT
+
 } // namespace detail
 
 // ╔═════════════════════════════════════════════════════════╗
@@ -239,6 +257,7 @@ concept styled = is_styled<std::remove_cvref_t<T>>::value;
 // ╚═════════════════════════════════════════════════════════╝
 
 /// @brief Represents a nullable terminal color.
+///
 /// @details
 /// A `Color` is similar to a tagged union with 4 color types.
 /// It stores a `ColorType` and a `uint8_t[3]` containing the data.
@@ -291,6 +310,7 @@ struct Color {
     constexpr auto type() const -> ColorType { return type_; }
 
     /// @brief Returns the raw data(`uint8_t[3]`) stored in this Color.
+    ///
     /// @details
     /// Usage:
     /// ```cpp
@@ -345,6 +365,7 @@ struct Color {
             }
         }
         assert(false);
+        return ""; // unreachable
     }
 
   private:
@@ -358,12 +379,19 @@ struct Color {
     detail::ColorData data_;
 };
 
-/// @brief Create a color from RGB
+// ╔═════════════════════════════════════════════════════════╗
+// ║                         Colors                          ║
+// ╚═════════════════════════════════════════════════════════╝
+
+inline namespace colors {
+
+/// Creates a color from RGB.
 constexpr auto rgb(uint8_t r, uint8_t g, uint8_t b) -> Color {
     return Color(r, g, b);
 }
 
-/// @brief Create a color from 0xRRGGBB
+/// @brief Creates a color from 0xRRGGBB.
+///
 /// @pre rgb <= 0xFFFFFF
 constexpr auto rgb(uint32_t hex) -> Color {
     // clang-format off
@@ -375,7 +403,8 @@ constexpr auto rgb(uint32_t hex) -> Color {
     // clang-format on
 }
 
-/// @brief Create a color from HSV
+/// @brief Creates a color from HSV.
+///
 /// @param h [0, 360): Hue of the color
 /// @param s [0, 255]: Saturation of the color
 /// @param v [0, 255]: Value (brightness) of the color
@@ -392,9 +421,9 @@ inline DECO_CONSTEXPR_CMATH auto hsv(uint16_t h, uint8_t s, uint8_t v) // NOLINT
     float vp = v / 255.0f;                             //NOLINT
 
     float f = hp - std::floor(hp);
-    uint8_t p = std::round(vp * (1 - sp) * 255);             //NOLINT
-    uint8_t q = std::round(vp * (1 - (f * sp)) * 255);       //NOLINT
-    uint8_t t = std::round(vp * (1 - ((1 - f) * sp)) * 255); //NOLINT
+    uint8_t p = static_cast<uint8_t>(std::round(vp * (1 - sp) * 255));             //NOLINT
+    uint8_t q = static_cast<uint8_t>(std::round(vp * (1 - (f * sp)) * 255));       //NOLINT
+    uint8_t t = static_cast<uint8_t>(std::round(vp * (1 - ((1 - f) * sp)) * 255)); //NOLINT
 
     switch (h / 60) {
         case 0 : return Color(v, t, p);
@@ -409,8 +438,6 @@ inline DECO_CONSTEXPR_CMATH auto hsv(uint16_t h, uint8_t s, uint8_t v) // NOLINT
     return Color::null_color();
     // clang-format on 
 }
-
-/* ----- color constants ----- */
 
 inline constexpr Color default_color   = Color::default_color();
 inline constexpr Color null_color      = Color::null_color();
@@ -434,11 +461,14 @@ inline constexpr Color bright_white    = Color(15);
 
 // clang-format on
 
+} // namespace colors
+
 // ╔═════════════════════════════════════════════════════════╗
 // ║                          Style                          ║
 // ╚═════════════════════════════════════════════════════════╝
 
 /// @brief Represents a nullable terminal style.
+///
 /// @details
 /// * It contains 8 emphasis flags and 2 `Color`s for foreground color and
 /// background color.
@@ -475,6 +505,7 @@ struct Style {
     // ----- operators -----
 
     /// @brief Combines two styles.
+    ///
     /// @details
     /// It works like applying 2 ANSI escape sequences, meaning that
     /// `std::cout << style1 << style2` is roughly equivalent to
@@ -541,7 +572,7 @@ struct Style {
 
         uint8_t current_flag = emphasis_;
         int count = 0;
-        do {
+        while (current_flag) {
             if (current_flag & 1u) {
                 if (needs_separate) *out++ = ';';
                 out = write_to(out, SGR_PARAM_STYLE[count]);
@@ -549,7 +580,7 @@ struct Style {
             }
             count++;
             current_flag >>= 1u;
-        } while (current_flag);
+        }
         return out;
     }
 
@@ -627,6 +658,7 @@ struct Style {
 };
 
 /// @brief A Style wrapper that represents an absolute style.
+///
 /// @details
 /// Style output normally has *additive semantics*, but this does't have.
 ///
@@ -675,7 +707,43 @@ struct AbsoluteStyle {
     Style style_;
 };
 
+/// manipulator that resets the terminal style.
+struct Reset {};
+inline constexpr Reset reset;
+
+/// output operator for `Style`
+inline auto operator<<(std::ostream& os, Style style) -> std::ostream& {
+    std::array<char, Style::MAX_ESCAPE_SEQ_SIZE> buf = {0};
+    auto len = style.to_escape(buf.begin()) - buf.begin();
+    os.write(buf.data(), len);
+    return os;
+}
+
+/// output operator for `AbsoluteStyle`
+inline auto operator<<(std::ostream& os, AbsoluteStyle abstyle)
+    -> std::ostream& {
+    std::array<char, AbsoluteStyle::MAX_ESCAPE_SEQ_SIZE> buf = {0};
+    auto len = abstyle.to_escape(buf.begin()) - buf.begin();
+    os.write(buf.data(), len);
+    return os;
+}
+
+/// output operator for deco::reset
+inline auto operator<<(std::ostream& os, Reset) -> std::ostream& {
+    std::array<char, Style::MAX_ESCAPE_SEQ_SIZE> buf = {0};
+    auto len = AbsoluteStyle(Style()).to_escape(buf.begin()) - buf.begin();
+    os.write(buf.data(), len);
+    return os;
+}
+
+// ╔═════════════════════════════════════════════════════════╗
+// ║                         Styles                          ║
+// ╚═════════════════════════════════════════════════════════╝
+
+inline namespace styles {
+
 /// @brief Creates an AbsoluteStyle from a Style.
+///
 /// @details equivalent to `AbsoluteStyle(style)`
 constexpr auto abs(Style style) -> AbsoluteStyle {
     return AbsoluteStyle(style);
@@ -696,37 +764,6 @@ constexpr auto bg(Color bg) -> Style {
     return Style(Style::Emphasis::None, null_color, bg);
 }
 
-/// IO manipulator that resets the terminal style.
-struct Reset {};
-inline constexpr Reset reset;
-
-/// output operator for `Style`
-inline auto operator<<(std::ostream& os, Style style) -> std::ostream& {
-    std::array<char, Style::MAX_ESCAPE_SEQ_SIZE> buf = {0};
-    auto len = style.to_escape(buf.begin()) - buf.begin();
-    os.write(buf.begin(), len);
-    return os;
-}
-
-/// output operator for `AbsoluteStyle`
-inline auto operator<<(std::ostream& os, AbsoluteStyle abstyle)
-    -> std::ostream& {
-    std::array<char, AbsoluteStyle::MAX_ESCAPE_SEQ_SIZE> buf = {0};
-    auto len = abstyle.to_escape(buf.begin()) - buf.begin();
-    os.write(buf.begin(), len);
-    return os;
-}
-
-/// output operator for deco::reset
-inline auto operator<<(std::ostream& os, Reset) -> std::ostream& {
-    std::array<char, Style::MAX_ESCAPE_SEQ_SIZE> buf = {0};
-    auto len = abs(Style()).to_escape(buf.begin()) - buf.begin();
-    os.write(buf.begin(), len);
-    return os;
-}
-
-/* ----- style constants ----- */
-
 // clang-format off
 
 inline constexpr Style null_style        = Style();
@@ -741,38 +778,57 @@ inline constexpr Style underline_double  = Style(Style::Emphasis::UnderlineDoubl
 
 // clang-format on
 
+} // namespace styles
+
 // ╔═════════════════════════════════════════════════════════╗
 // ║                         styled                          ║
 // ╚═════════════════════════════════════════════════════════╝
 
-/// @brief Creates a styled wrapper of a value.
-/// @details
-/// `std::cout << styled(s, v)` is equivalent to
-/// `std::cout << s << v << deco::reset;`.
+/// @brief Creates a styled wrapper aroune a value.
 ///
-/// @return An implementation-defined object that associates `value` with
-/// `style`. Lvalues are stored by reference and rvalues are stored by value.
+/// @details
+/// `std::cout << styled(value, style)` is equivalent to
+/// `std::cout << style << value << deco::reset;`.
+///
+/// @warning
+/// The returned object has **reference semantics** and must not outlive value.
+///
+/// **Example**
+/// ```cpp
+/// auto styled_int = styled(42, bold);  // BAD: dangling reference
+/// std::cout << styled(42, bold);       // OK
+/// ```
 template <typename T>
-constexpr auto styled(T&& value, Style style) {
-    return detail::Styled(detail::ValueOrRef(std::forward<T>(value)), style);
+    requires(!detail::style_type<T>)
+constexpr auto styled(const T& value, Style style) {
+    return detail::Styled(value, style);
 }
 
 /// `AbsoluteStyle` version of `styled()`
 template <typename T>
-constexpr auto styled(T&& value, AbsoluteStyle abstyle) {
-    return detail::Styled(detail::ValueOrRef(std::forward<T>(value)), abstyle);
+    requires(!detail::style_type<T>)
+constexpr auto styled(const T& value, AbsoluteStyle abstyle) {
+    return detail::Styled(value, abstyle);
 }
 
 /// shorthand for `styled(value, style)`
 template <typename T>
-constexpr auto operator|(Style style, T&& value) {
-    return styled(std::forward<T>(value), style);
+    requires(!detail::style_type<T> && !detail::styled<T>)
+constexpr auto operator|(const T& value, Style style) {
+    return styled(value, style);
 }
 
 /// shorthand for `styled(value, abstyle)`
 template <typename T>
-constexpr auto operator|(AbsoluteStyle abstyle, T&& value) {
-    return styled(std::forward<T>(value), abstyle);
+    requires(!detail::style_type<T> && !detail::styled<T>)
+constexpr auto operator|(const T& value, AbsoluteStyle abstyle) {
+    return styled(value, abstyle);
+}
+
+template <typename T>
+constexpr auto operator|(const detail::Styled<Style, T>& styled, Style style)
+    -> detail::Styled<Style, T> {
+    return detail::Styled(styled.value(), styled.style() | style);
 }
 
 /// output operator for `styled()`
@@ -786,6 +842,59 @@ inline auto operator<<(std::ostream& os,
 
 } // namespace deco
 
+#ifdef DECOTERM_ENABLE_STD_FORMAT
+
+// ╔═════════════════════════════════════════════════════════╗
+// ║                       formatters                        ║
+// ╚═════════════════════════════════════════════════════════╝
+
+namespace std {
+
+/// formatter for style types
+template <deco::detail::style_type StyleT>
+struct formatter<StyleT> {
+    constexpr auto parse(std::format_parse_context& ctx) const {
+        return ctx.begin();
+    }
+
+    auto format(StyleT style, std::format_context& ctx) const {
+        return style.to_escape(ctx.out());
+    }
+};
+
+/// formatter for `deco::reset`
+template <>
+struct formatter<deco::Reset> {
+    constexpr auto parse(std::format_parse_context& ctx) const {
+        return ctx.begin();
+    }
+
+    auto format(deco::Reset, std::format_context& ctx) const {
+        return deco::abs(deco::null_style).to_escape(ctx.out());
+    }
+};
+
+/// formatter for `styled()`
+template <deco::detail::style_type StyleT, typename T>
+    requires deco::formattable<T>
+struct formatter<deco::detail::Styled<StyleT, T>>
+    : deco::detail::formatter_t<T> {
+    auto format(const deco::detail::Styled<StyleT, T>& styled,
+                std::format_context& ctx) const {
+        using namespace deco;
+
+        ctx.advance_to(styled.style().to_escape(ctx.out()));
+        ctx.advance_to(detail::formatter_t<T>::format(styled.value(), ctx));
+        ctx.advance_to(abs(null_style).to_escape(ctx.out()));
+
+        return ctx.out();
+    }
+};
+
+} // namespace std
+
+#endif // DECOTERM_ENABLE_STD_FORMAT
+
 #undef DECO_CONSTEXPR_CMATH
 
-#endif // !DECOTERM_STYLE_HPP
+#endif // !DECOTERM_DECO_HPP

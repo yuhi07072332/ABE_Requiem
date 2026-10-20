@@ -7,7 +7,7 @@
 #include <fstream>
 #include <ios>
 
-#include "third_party/decoterm/format.hpp" // IWYU pragma: keep
+#include "third_party/decoterm.hpp"
 #include "third_party/argparse.hpp"
 
 #include "cli.hpp"
@@ -22,35 +22,35 @@ static std::vector<Command> commands;
 static std::string selected_command;
 
 static void print_help() {
-    const deco::Style placeholder_s = deco::fg(deco::bright_yellow);
-    const deco::Style title_s = deco::bold | deco::underline;
-    const deco::Style highlight_s = deco::bold | deco::fg(deco::bright_blue);
+    const deco::Style placeholder = deco::fg(deco::bright_yellow);
+    const deco::Style title = deco::bold | deco::underline;
+    const deco::Style highlight = deco::bold | deco::fg(deco::bright_blue);
 
-    std::println("{}", title_s | "使い方\n");
+    std::println("{}", "使い方\n" | title);
     std::println("./genk {} {} {}",
-                 deco::dim | "[オプション...]",
-                 placeholder_s | "<コマンド>",
-                 placeholder_s | "<地図データファイル>");
+                 "[オプション...]" | deco::dim,
+                 "<コマンド>" | placeholder,
+                 "<地図データファイル>" | placeholder);
     std::println("");
 
-    std::println("{}", title_s | "コマンド\n");
+    std::println("{}", "コマンド\n" | title);
     for (const auto& [name, desc, _] : commands)
-        std::println("{:8}\t\t{}", highlight_s | name, desc);
+        std::println("{:8}\t\t{}", name | highlight, desc);
     std::println("");
 
-    std::println("{}", title_s | "オプション\n");
+    std::println("{}", "オプション\n" | title);
     std::println("{}\t\t出力ファイル名を指定(デフォルト: out.wrl)",
-                 highlight_s | "-o <ファイル名>");
+                 "-o <ファイル名>" | highlight);
     std::println("{}\t\t出力する際にファイルを上書きするのではなく追加する",
-                 highlight_s | "-a, --append");
+                 "-a, --append" | highlight);
     std::println("{}\t\tヘルプメッセージを出力",
-                 highlight_s | "-h, --help");
+                 "-h, --help" | highlight);
 }
 
 static void print_error(std::string_view msg) {
     std::println(stderr,
                  "{} {}\n",
-                 deco::bold | deco::fg(deco::bright_red) | "エラー: ",
+                 "エラー: " | deco::bold | deco::fg(deco::bright_red),
                  msg);
 }
 

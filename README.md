@@ -11,8 +11,8 @@
 src/  ← ソースコード
 └── third_party/  ← 外部ライブラリ
     ├── argparse.hpp　← コマンドライン解析
-    ├── decoterm/　    ← 自作カラー出力ライブラリ(ドヤ)
-    └── delaunator/　  ← ドロネー三角形分割
+    ├── decoterm.hpp  ← 自作カラー出力ライブラリ(ドヤ)
+    └── delaunator/　 ← ドロネー三角形分割
 
 ```
 
