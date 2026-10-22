@@ -3,7 +3,7 @@
 画映1 ABE Requiem チームのリポジトリです。  
 
 [Gitチュートリアル](/git_tutor.md)  
-[マニュアル](/manual.md)  
+[コーディングマニュアル](/manual.md)  
 
 ## ディレクトリ構造
 
