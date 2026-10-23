@@ -38,7 +38,7 @@ Shape {{
     std::print(os, FMT1, data.cols, data.rows);
 
     int count = 0;
-    for (int z = 0; z < data.rows; ++z) {
+    for (z = 0; z < data.rows; ++z) {
         for (int x = 0; x < data.cols; ++x) {
             if (data.is_missing(z, x)) std::print(os, "100, ");
             else std::print(os, "{}, ", data.at(z, x));
