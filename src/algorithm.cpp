@@ -88,7 +88,7 @@ std::vector<Coord> find_ground(const MapData& data) {
     };
 
     int chunks_rows = data.rows / CHUNK_HEIGHT;
-    int chunks_cols = data.cols // CHUNK_WIDTH;
+    int chunks_cols = data.cols / CHUNK_WIDTH;
 
     for (int r = 0; r < chunks_rows; ++r) {
         for (int c = 0; c < chunks_cols; ++c) {
