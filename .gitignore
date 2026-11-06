@@ -5,3 +5,4 @@ map_data
 *.dat
 genk
 build/
+.vscode/
