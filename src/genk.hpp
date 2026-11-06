@@ -51,8 +51,6 @@ struct MapData {
     Point point_at(Coord c) const { return point_at(c.i, c.j); }
 
     /// i行j列のTypeを取得
-    Type type_at(int i, int j) const { return types.at(i * cols + j); }
-    Type type_at(Coord c) const { return types.at(c.i * cols + c.j); }
     Type& type_at(int i, int j) { return types.at(i * cols + j); }
     Type& type_at(Coord c) { return types.at(c.i * cols + c.j); }
 
