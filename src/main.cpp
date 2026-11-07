@@ -53,7 +53,9 @@ void gen_points(const Option& opt) {
                  opt.output_file | deco::fg(deco::bright_yellow));
 }
 
-void test(const Option& opt) { std::println("{}", opt.output_file); }
+void test(const Option& opt) {
+    test_find_building_outline();
+}
 
 // ┌                                                         ┐
 // │                          main                           │
