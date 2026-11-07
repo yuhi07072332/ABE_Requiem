@@ -210,7 +210,7 @@ void test_find_building_outline() {
 
     int count = 1;
     for (auto& building : buildings) {
-        std::println("建物{}: ({}, {}) ~ ({}, {}):",
+        std::println("建物{}: ({}, {}) ~ ({}, {}):\n",
                      count++,
                      building.top_left.i,
                      building.top_left.j,

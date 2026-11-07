@@ -53,9 +53,11 @@ void gen_points(const Option& opt) {
                  opt.output_file | deco::fg(deco::bright_yellow));
 }
 
-void test(const Option& opt) {
+void test_building([[maybe_unused]] const Option& opt) {
     test_find_building_outline();
 }
+
+void test([[maybe_unused]] const Option& opt) { }
 
 // ┌                                                         ┐
 // │                          main                           │
@@ -68,6 +70,7 @@ int main(int argc, const char** argv) {
             "report-heights", "点群の高さの度数分布表を表示", report_heights);
         add_command("test-ground", "地面判定アルゴリズムをテスト", test_ground);
         add_command("gen-points", "地図データから点群を直接出力", gen_points);
+        add_command("test_building", "建物に関する処理を仮想データでテスト", test_building);
 
         add_command("test", "テスト用コマンド", test);
 
