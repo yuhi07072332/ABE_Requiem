@@ -63,7 +63,6 @@ struct MapData {
 
 std::map<int, int> calc_frequency(const std::vector<double>& heights,
                                   int width = 5);
-std::vector<Coord> find_ground(const MapData& data);
 
 
 /* ----- vrml ----- */

@@ -38,7 +38,7 @@ std::map<int, int> calc_frequency(const std::vector<double>& heights,
     return freq;
 }
 
-/// @brief 地面と判定された点群を返す
+/// @brief [仮アルゴリズムなので非推奨] 地面と判定された点群を返す
 /// @details
 /// 暫定のアルゴリズム:
 /// * 高さの度数が最も高い2つの階級(の下限値)を地面高さの候補とし、高さがそれ
@@ -52,7 +52,7 @@ std::map<int, int> calc_frequency(const std::vector<double>& heights,
 /// * 斜めの地面を建物に誤判定することがある
 /// * 逆に建物が地面に誤判定することがある
 /// * チャンク間のつなぎがあまり綺麗じゃないことがある
-std::vector<Coord> find_ground(const MapData& data) {
+[[deprecated]] std::vector<Coord> find_ground(const MapData& data) {
     constexpr int N = 2;
     constexpr int CHUNK_WIDTH = 16;
     constexpr int CHUNK_HEIGHT = 16;
