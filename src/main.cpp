@@ -12,6 +12,10 @@
 // ┌                                                         ┐
 // │                        コマンド                         │
 // └                                                         ┘
+// NOTE: 
+// * コマンド関数は`void()`または`void(const Option& opt)`の形であること
+// * 基本的な流れとして、`read_map(opt.input_file)`でMapDataを読み込み、
+//   `open_output_file(opt)`で出力ファイルへの`std::ofstream`を受け取る
 
 void report_heights(const Option& opt) {
     MapData data = read_map(opt.input_file);
@@ -29,11 +33,13 @@ void gen_points(const Option& opt) {
                  opt.output_file | deco::fg(deco::bright_yellow));
 }
 
-void test_building([[maybe_unused]] const Option& opt) {
+void test_building() {
     test_building_algor();
 }
 
-void test([[maybe_unused]] const Option& opt) { }
+void test() {
+    
+}
 
 // ┌                                                         ┐
 // │                          main                           │

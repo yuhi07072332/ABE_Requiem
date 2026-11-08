@@ -7,6 +7,7 @@
 #include <iosfwd>
 #include <cstdint>
 
+/// VRMLの座標を表す
 struct Point {
     int x, z;
     double y;
@@ -67,6 +68,7 @@ struct MapData {
     bool is_missing(int i, int j) const { return std::isnan(at(i, j)); }
     bool is_missing(Coord c) const { return is_missing(c.i, c.j); }
 
+    // i行j列の点がMapData範囲内に入っているか
     bool contains(int i, int j) const {
         return i >= 0 && i < rows && j >= 0 && j < cols;
     }

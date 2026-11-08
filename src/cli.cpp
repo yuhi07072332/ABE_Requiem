@@ -1,4 +1,5 @@
 #include <string_view>
+#include <variant>
 #include <vector>
 #include <print>
 #include <exception>
@@ -11,6 +12,23 @@
 #include "third_party/argparse.hpp"
 
 #include "cli.hpp"
+
+struct CommandAction {
+    using OptFn = std::function<void(const Option&)>;
+    using VoidFn = std::function<void(void)>;
+
+    std::variant<OptFn, VoidFn> action;
+
+    void operator()(const Option& opt) const {
+        if (auto* fn = std::get_if<OptFn>(&action))
+            (*fn)(opt);
+    }
+
+    void operator()() const {
+        if (auto* fn = std::get_if<VoidFn>(&action))
+            (*fn)();
+    }
+};
 
 struct Command {
     std::string name;
@@ -96,15 +114,26 @@ Option parse_args(int argc, const char** argv) {
     return opt;
 }
 
-void add_command(std::string name, std::string desc, CommandAction action) {
-    commands.emplace_back(std::move(name), std::move(desc), action);
+
+void add_command(std::string name,
+                 std::string desc,
+                 std::function<void(const Option&)> action) {
+    commands.emplace_back(std::move(name), std::move(desc), CommandAction(std::move(action)));
 }
+
+void add_command(std::string name,
+                 std::string desc,
+                 std::function<void()> action) {
+    commands.emplace_back(std::move(name), std::move(desc), CommandAction(std::move(action)));
+}
+
 
 void run_command(const Option& opt) {
     for (const auto& command : commands) {
         if (command.name == selected_command) {
             try {
                 command.action(opt);
+                command.action();
             } catch (const std::exception& e) {
                 print_error(e.what());
                 throw std::exception();
