@@ -15,6 +15,13 @@ struct Point {
 /// 行列内の位置を表す
 struct Coord {
     int i, j;
+
+    // 大小比較, ==, !=の演算子
+    auto operator<=>(const Coord&) const = default;
+
+    // +-演算子
+    Coord operator+(Coord other) const { return {i + other.i, j + other.j}; }
+    Coord operator-(Coord other) const { return {i - other.i, j - other.j}; }
 };
 
 // 点の種類
@@ -59,6 +66,11 @@ struct MapData {
     /// i行j列の点が欠損点かどうかを判定
     bool is_missing(int i, int j) const { return std::isnan(at(i, j)); }
     bool is_missing(Coord c) const { return is_missing(c.i, c.j); }
+
+    bool contains(int i, int j) const {
+        return i >= 0 && i < rows && j >= 0 && j < cols;
+    }
+    bool contains(Coord c) const { return contains(c.i, c.j); }
 };
 
 /* ----- algorithm ----- */

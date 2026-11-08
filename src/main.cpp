@@ -70,7 +70,7 @@ int main(int argc, const char** argv) {
             "report-heights", "点群の高さの度数分布表を表示", report_heights);
         add_command("test-ground", "地面判定アルゴリズムをテスト", test_ground);
         add_command("gen-points", "地図データから点群を直接出力", gen_points);
-        add_command("test_building", "建物に関する処理を仮想データでテスト", test_building);
+        add_command("test-building", "建物に関する処理を仮想データでテスト", test_building);
 
         add_command("test", "テスト用コマンド", test);
 

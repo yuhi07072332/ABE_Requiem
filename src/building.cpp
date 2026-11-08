@@ -1,13 +1,19 @@
 #include <algorithm>
 #include <limits>
+#include <optional>
 #include <print>
 #include <cstdint>
 #include <array>
 #include <queue>
 #include <mdspan>
+#include <ranges>
+#include <set>
+#include <vector>
 
 #include "third_party/decoterm.hpp"
 #include "genk.hpp"
+
+namespace views = std::views;
 
 template <typename T>
 using Matrix = std::mdspan<T, std::dextents<std::size_t, 2>>;
@@ -15,8 +21,34 @@ using Matrix = std::mdspan<T, std::dextents<std::size_t, 2>>;
 // std::vector<bool>避ける用
 using Bool = std::int8_t;
 
+/// 4近傍
+constexpr std::array<Coord, 4> n4_dirs = {{
+    {0, -1},
+    {-1, 0},
+    {0, 1},
+    {1, 0}
+}};
+
+/// 8近傍
+constexpr std::array<Coord, 8> n8_dirs = {{
+    {-1,  0},
+    {-1,  1},
+    { 0,  1},
+    { 1,  1},
+    { 1,  0},
+    { 1, -1},
+    { 0, -1},
+    {-1, -1},
+}};
+
+bool is_n4(Coord dir) {
+    return dir.i == 0 || dir.j == 0;
+}
+
 struct Building {
-    std::vector<Coord> coords;
+    std::set<Coord> coords;
+    std::vector<std::vector<Coord>> outlines;
+
     Coord top_left = {
         std::numeric_limits<int>::max(),
         std::numeric_limits<int>::max()
@@ -24,7 +56,7 @@ struct Building {
     Coord bottom_right = {0, 0};
 
     void push_back(Coord c) {
-        coords.push_back(c);
+        coords.insert(c);
         top_left.i = std::min(top_left.i, c.i);
         top_left.j = std::min(top_left.j, c.j);
         bottom_right.i = std::max(bottom_right.i, c.i);
@@ -34,27 +66,21 @@ struct Building {
 
 /// @brief 建物の輪郭検出を行う
 static void find_building_outline(MapData& data) {
-    constexpr std::array<Coord, 4> dirs = {
-        Coord {0, -1},
-        Coord {-1, 0},
-        Coord {0, 1},
-        Coord {1, 0}
-    };
-
     for (int i = 0 ; i < data.rows; ++i) {
         for (int j = 0 ; j < data.cols; ++j) {
+            Coord c = {i, j};
             if (data.type_at(i, j) != Type::Building) continue;
-            for (Coord dc : dirs) {
-                Coord nc = {i + dc.i, j + dc.j};
+            for (Coord dc : n4_dirs) {
+                Coord nc = c + dc;
 
-                if (nc.i < 0 || nc.i >= data.rows || nc.j < 0 || nc.j >= data.cols) {
-                    data.type_at(i, j) = Type::BuildingOutline;
+                if (!data.contains(nc)) {
+                    data.type_at(c) = Type::BuildingOutline;
                     break;
                 }
 
                 if (data.type_at(nc) != Type::Building 
                     && data.type_at(nc) != Type::BuildingOutline) {
-                    data.type_at(i, j) = Type::BuildingOutline;
+                    data.type_at(c) = Type::BuildingOutline;
                     break;
                 }
             }
@@ -65,12 +91,6 @@ static void find_building_outline(MapData& data) {
 /// @brief startから建物をBFS探索していく
 static Building bfs_building(const MapData& data, Matrix<Bool> visited, Coord start) {
     assert(data.type_at(start) == Type::BuildingOutline);
-    constexpr std::array<Coord, 4> dirs = {
-        Coord {0, -1},
-        Coord {-1, 0},
-        Coord {0, 1},
-        Coord {1, 0}
-    };
 
     Building building;
     std::queue<Coord> queue;
@@ -82,9 +102,9 @@ static Building bfs_building(const MapData& data, Matrix<Bool> visited, Coord st
 
         building.push_back(c);
 
-        for (Coord dc: dirs) {
-            Coord nc = { c.i + dc.i, c.j + dc.j };
-            if (nc.i < 0 || nc.i >= data.rows || nc.j < 0 || nc.j >= data.cols)
+        for (Coord dc: n4_dirs) {
+            Coord nc = c + dc;
+            if (!data.contains(nc))
                 continue;
 
             if (visited[nc.i, nc.j]) continue;
@@ -102,11 +122,11 @@ static Building bfs_building(const MapData& data, Matrix<Bool> visited, Coord st
 
 /// @brief 建物(輪郭と内部)と判定された点群の領域を建物ごとに分別する
 ///
-/// @details BFSで探索を行う
+/// @details 建物の輪郭からBFSで探索を行う
 static std::vector<Building> ccl_buildings(const MapData& data) {
     std::vector<Building> buildings;
-    std::vector<Bool> visit = std::vector<Bool>(data.rows * data.cols, false);
-    Matrix<Bool> visited{visit.data(), data.rows, data.cols};
+    std::vector<Bool> visited_arr = std::vector<Bool>(data.rows * data.cols, false);
+    Matrix<Bool> visited{visited_arr.data(), data.rows, data.cols};
 
     for (int i = 0; i < data.rows; ++i) {
         for (int j = 0; j < data.cols; ++j) {
@@ -117,6 +137,91 @@ static std::vector<Building> ccl_buildings(const MapData& data) {
     }
 
     return buildings;
+}
+
+struct TraceState {
+    Coord current;
+    Coord backtrack;
+
+    bool operator==(const TraceState&) const = default;
+};
+
+/// @brief MNT: 次の輪郭を検出
+static std::optional<TraceState> trace_next(TraceState state, const MapData& data, const std::set<Coord>& visited) {
+    auto [current, backtrack] = state;
+    
+    int b_dir = -1;
+    for (auto [i, dc] : n8_dirs | views::enumerate) {
+        if (dc + current == backtrack) {
+            b_dir = i;
+            break;
+        }
+    }
+
+    if (b_dir == -1) return std::nullopt;
+
+    for (int i : views::iota(0, static_cast<int>(n8_dirs.size()))) {
+        int dir = (b_dir + i + 1) % 8;
+        Coord nc = current + n8_dirs[dir];
+
+        if (!data.contains(nc) || data.type_at(nc) != Type::BuildingOutline) continue;
+        if (visited.contains(nc)) continue;
+
+        int prev_dir = (dir + 7) % 8;
+        return TraceState {
+            .current = nc,
+            .backtrack = current + n8_dirs[prev_dir]
+        };
+    }
+
+    return std::nullopt;
+}
+
+/// @brief MNTでbeginから建物の輪郭を時計回りに探索する
+static std::vector<Coord> mnt(const MapData& data, Coord begin, const std::set<Coord>& visited) {
+    assert(data.type_at(begin) == Type::BuildingOutline);
+
+    TraceState init_state = {
+        .current = begin,
+        .backtrack = begin - Coord {0, 1}
+    };
+
+    std::vector<Coord> outline_coords = { begin };
+
+    std::optional<TraceState> curr_state = init_state;
+    while (true) {
+        auto next_state = trace_next(*curr_state, data, visited);
+        if (!next_state.has_value()) break;
+        if (*next_state == init_state) break;
+
+        outline_coords.push_back(next_state->current);
+        curr_state = next_state;
+    }
+
+    return outline_coords;
+}
+
+/// @brief Buildingの全ての輪郭を検出
+static void scan_outlines(const MapData& data, Building& building) {
+    std::set<Coord> visited;
+
+    for (int i = building.top_left.i; i < building.bottom_right.i; ++i) {
+        for (int j = building.top_left.j; j < building.bottom_right.j; ++j) {
+            Coord c = {i, j};
+            if (visited.contains(c)) continue;
+            if (data.type_at(c) == Type::BuildingOutline && building.coords.contains(c)) {
+                auto outline = mnt(data, c, visited);
+                for (Coord c : outline) {
+                    visited.insert(c);
+                }
+                building.outlines.emplace_back(std::move(outline));
+            }
+        }
+    }
+}
+
+static void simplify_outline(std::vector<Coord>& outline) {
+    
 }
 
 // ──────────────────────────────── test ─────────────────────────────
@@ -175,11 +280,21 @@ static consteval auto test_type_grid() {
     return converted_arr;
 }
 
-static void print_type_grid(Matrix<Type> type_grid, Coord top_left, Coord bottom_right) {
+template <typename F>
+static void print_type_grid(
+    Matrix<const Type> type_grid,
+    Coord top_left,
+    Coord bottom_right,
+    const F& filter
+) {
     using deco::fg;
 
     for (int i = top_left.i; i <= bottom_right.i; ++i) {
         for (int j = top_left.j; j <= bottom_right.j; ++j) {
+            if (!filter(Coord{i, j})) {
+                std::print("{}", '.' | deco::dim);
+                continue;
+            }
             switch (type_grid[i, j]) {
                 case Type::Building: std::print("{}", 'B' | fg(deco::bright_blue)); break;
                 case Type::BuildingOutline: std::print("O"); break;
@@ -190,12 +305,28 @@ static void print_type_grid(Matrix<Type> type_grid, Coord top_left, Coord bottom
     }
 }
 
-static void print_type_grid(Matrix<Type> type_grid) {
+static void print_type_grid(Matrix<const Type> type_grid) {
     const Coord bottom_right = {
         static_cast<int>(type_grid.extent(0) - 1),
         static_cast<int>(type_grid.extent(1) - 1),
     };
-    print_type_grid(type_grid, {0, 0}, bottom_right);
+    print_type_grid(
+        type_grid,
+        {0, 0},
+        bottom_right,
+        []([[maybe_unused]] Coord c){ return true; }
+    );
+}
+
+static void print_building(Matrix<const Type> type_grid, const Building& building) {
+    print_type_grid(
+        type_grid,
+        building.top_left,
+        building.bottom_right,
+        [&building](Coord c){
+            return building.coords.contains(c);
+        }
+    );
 }
 
 /// 輪郭検出アルゴリズムをテスト
@@ -228,15 +359,26 @@ void test_find_building_outline() {
 
     int count = 1;
     for (auto& building : buildings) {
-        std::println("建物{}: ({}, {}) ~ ({}, {}):\n",
+        std::println("\n建物{}: ({}, {}) ~ ({}, {}):\n",
                      count++,
                      building.top_left.i,
                      building.top_left.j,
                      building.bottom_right.i,
                      building.bottom_right.j);
 
-        print_type_grid(type_grid, building.top_left, building.bottom_right);
-        std::println("");
+        print_building(type_grid, building);
+        scan_outlines(data, building);
+        for (const auto [i, outline] : building.outlines | views::enumerate) {
+            std::println("\n輪郭{}: ", i + 1);
+            print_type_grid(
+                type_grid,
+                building.top_left,
+                building.bottom_right,
+                [&outline](Coord c){
+                    return std::ranges::contains(outline, c);
+                }
+            );
+        }
     }
 
 }
