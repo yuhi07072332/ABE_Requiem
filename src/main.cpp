@@ -29,7 +29,11 @@ void gen_points(const Option& opt) {
                  opt.output_file | deco::fg(deco::bright_yellow));
 }
 
-void test(const Option& opt) { std::println("{}", opt.output_file); }
+void test_building([[maybe_unused]] const Option& opt) {
+    test_building_algor();
+}
+
+void test([[maybe_unused]] const Option& opt) { }
 
 // ┌                                                         ┐
 // │                          main                           │
@@ -41,6 +45,7 @@ int main(int argc, const char** argv) {
         add_command(
             "report-heights", "点群の高さの度数分布表を表示", report_heights);
         add_command("gen-points", "地図データから点群を直接出力", gen_points);
+        add_command("test-building", "建物に関する処理を仮想データでテスト", test_building);
 
         add_command("test", "テスト用コマンド", test);
 
