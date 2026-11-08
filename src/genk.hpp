@@ -96,4 +96,4 @@ MapData read_map(std::string_view data_path);
 
 /* ----- building ----- */
 
-void test_find_building_outline();
+void test_building_algor();

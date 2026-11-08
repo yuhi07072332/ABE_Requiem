@@ -54,7 +54,7 @@ void gen_points(const Option& opt) {
 }
 
 void test_building([[maybe_unused]] const Option& opt) {
-    test_find_building_outline();
+    test_building_algor();
 }
 
 void test([[maybe_unused]] const Option& opt) { }
