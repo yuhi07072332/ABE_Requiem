@@ -9,6 +9,8 @@
 #include <ranges>
 #include <set>
 #include <vector>
+#include <format>
+#include <print>
 
 #include "genk.hpp"
 #include "third_party/decoterm.hpp"
@@ -150,7 +152,6 @@ struct TraceState {
     bool operator==(const TraceState&) const = default;
 };
 
-/// @brief MNT: 次の輪郭を検出
 static std::optional<TraceState> trace_next(TraceState state,
                                             const MapData& data,
                                             const std::set<Coord>& visited) {
@@ -182,8 +183,9 @@ static std::optional<TraceState> trace_next(TraceState state,
     return std::nullopt;
 }
 
-/// @brief Moore neighborhood
-/// tracingを使ってbeginから建物の輪郭を時計回りに探索する 参考:
+/// @brief Moore neighborhood tracingを使ってbeginから建物の輪郭を時計回りに探索する 
+///
+/// 参考:
 /// https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/moore.html
 static std::vector<Coord> mnt(const MapData& data,
                               Coord begin,
@@ -247,6 +249,16 @@ static void simplify_outline(Building& building, std::vector<Coord>& outline_pat
         | views::filter([&](Coord c){ return !vertices.contains(c); })) {
         building.coords.erase(c);
     }
+}
+
+std::ostream& operator<<(std::ostream& os, Coord c) {
+    os << '(' << c.i << ", " << c.j << ')';
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, Point p) {
+    os << '(' << p.x << ", " << p.y << ", " << p.z << ')';
+    return os;
 }
 
 // ──────────────────────────────── test ─────────────────────────────

@@ -7,7 +7,7 @@
 #include <iosfwd>
 #include <cstdint>
 
-/// VRMLの座標を表す
+/// VRMLでの座標を表す
 struct Point {
     int x, z;
     double y;
@@ -17,7 +17,7 @@ struct Point {
 struct Coord {
     int i, j;
 
-    // 大小比較, ==, !=の演算子
+    // 大小比較, ==, !=演算子
     auto operator<=>(const Coord&) const = default;
 
     // +-演算子
@@ -98,3 +98,6 @@ MapData read_map(std::string_view data_path);
 /* ----- building ----- */
 
 void test_building_algor();
+
+std::ostream& operator<<(std::ostream&, Coord);
+std::ostream& operator<<(std::ostream&, Point);
