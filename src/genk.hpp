@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <map>
+#include <set>
 #include <string_view>
 #include <cmath>
 #include <iosfwd>
@@ -90,6 +91,8 @@ void show_mapdata_types(const MapData& data);
 std::map<int, int> calc_frequency(const std::vector<double>& heights,
                                   int width = 5);
 
+/* ----- missing ----- */
+
 /// 欠損点補完
 void fill_missing(MapData& data);
 
@@ -109,6 +112,25 @@ int write_delaunay_triangulation(std::ostream& os,
 MapData read_map(std::string_view data_path);
 
 /* ----- building ----- */
+
+struct Building {
+    std::set<Coord> coords;
+    std::vector<std::vector<Coord>> outline_paths;
+
+    Coord top_left = {std::numeric_limits<int>::max(),
+                      std::numeric_limits<int>::max()};
+    Coord bottom_right = {0, 0};
+
+    void push_back(Coord c) {
+        coords.insert(c);
+        top_left.i = std::min(top_left.i, c.i);
+        top_left.j = std::min(top_left.j, c.j);
+        bottom_right.i = std::max(bottom_right.i, c.i);
+        bottom_right.j = std::max(bottom_right.j, c.j);
+    }
+};
+
+std::vector<Building> process_building(MapData& data);
 
 void test_building_algor();
 

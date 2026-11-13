@@ -51,23 +51,6 @@ bool is_n4(Coord dir) { return dir.i == 0 || dir.j == 0; }
 
 auto indices(auto a, auto b) { return views::iota(decltype(b)(a), b); }
 
-struct Building {
-    std::set<Coord> coords;
-    std::vector<std::vector<Coord>> outline_paths;
-
-    Coord top_left = {std::numeric_limits<int>::max(),
-                      std::numeric_limits<int>::max()};
-    Coord bottom_right = {0, 0};
-
-    void push_back(Coord c) {
-        coords.insert(c);
-        top_left.i = std::min(top_left.i, c.i);
-        top_left.j = std::min(top_left.j, c.j);
-        bottom_right.i = std::max(bottom_right.i, c.i);
-        bottom_right.j = std::max(bottom_right.j, c.j);
-    }
-};
-
 /// @brief 建物の輪郭検出を行う
 static void find_building_outline(MapData& data) {
     for (int i = 0; i < data.rows; ++i) {
@@ -249,6 +232,21 @@ static void simplify_outline(Building& building, std::vector<Coord>& outline_pat
         | views::filter([&](Coord c){ return !vertices.contains(c); })) {
         building.coords.erase(c);
     }
+}
+
+std::vector<Building> process_building(MapData& data) {
+    find_building_outline(data);
+    auto buildings = ccl_buildings(data);
+    std::println("建物検出: {}個", buildings.size());
+    std::println("建物削減中...");
+    for (auto [n, building] : buildings | views::enumerate) {
+        scan_outlines(data, building);
+        for (const auto [i, outline_path] :
+             building.outline_paths | views::enumerate) {
+            simplify_outline(building, outline_path);
+        }
+    }
+    return buildings;
 }
 
 // ──────────────────────────────── test ─────────────────────────────
