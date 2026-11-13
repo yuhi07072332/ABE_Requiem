@@ -3,7 +3,6 @@
 #include <fstream>
 #include <print>
 #include <string>
-#include <vector>
 
 #include "third_party/decoterm.hpp"
 
@@ -13,6 +12,10 @@
 // ┌                                                         ┐
 // │                        コマンド                         │
 // └                                                         ┘
+// NOTE: 
+// * コマンド関数は`void()`または`void(const Option& opt)`の形であること
+// * 基本的な流れとして、`read_map(opt.input_file)`でMapDataを読み込み、
+//   `open_output_file(opt)`で出力ファイルへの`std::ofstream`を受け取る
 
 void report_heights(const Option& opt) {
     MapData data = read_map(opt.input_file);
@@ -20,29 +23,6 @@ void report_heights(const Option& opt) {
     std::println("ファイル: {}", opt.input_file);
     for (auto [lower, frequency] : freq)
         std::println("\"[{:>3}, {:>3}]\", {}", lower, lower + 5, frequency);
-}
-
-void test_ground(const Option& opt) {
-    MapData data = read_map(opt.input_file);
-
-    std::println("{}", "地面判定中..." | deco::bold | deco::fg(deco::yellow));
-    auto ground_coords = find_ground(data);
-    std::println("マップ内点群数: {}", data.grid.size());
-    std::println("地面判定した点群数: {} (~{}%)",
-                 ground_coords.size(),
-                 ground_coords.size() * 100 / data.grid.size());
-
-    std::ofstream ofs = open_output_file(opt);
-    std::println(ofs, VRML_HEADER);
-    int triangles = write_delaunay_triangulation(ofs, ground_coords, data);
-
-    std::println("面数(三角形数): {}", triangles);
-    std::println("総データ量(点 + 面の数): {} (~{}%)",
-                 (ground_coords.size() + triangles) | deco::bold
-                     | deco::fg(deco::bright_yellow),
-                 (ground_coords.size() + triangles) * 100 / data.grid.size());
-    std::println("{} に出力しました",
-                 opt.output_file | deco::fg(deco::bright_yellow));
 }
 
 void gen_points(const Option& opt) {
@@ -53,7 +33,15 @@ void gen_points(const Option& opt) {
                  opt.output_file | deco::fg(deco::bright_yellow));
 }
 
-void test(const Option& opt) { std::println("{}", opt.output_file); }
+void test_building() {
+    test_building_algor();
+}
+
+void test(const Option& opt) {
+    MapData data = read_map(opt.input_file);
+    classify_map(data);
+    show_mapdata_types(data);
+}
 
 // ┌                                                         ┐
 // │                          main                           │
@@ -64,8 +52,8 @@ int main(int argc, const char** argv) {
         // コマンドを登録
         add_command(
             "report-heights", "点群の高さの度数分布表を表示", report_heights);
-        add_command("test-ground", "地面判定アルゴリズムをテスト", test_ground);
         add_command("gen-points", "地図データから点群を直接出力", gen_points);
+        add_command("test-building", "建物に関する処理を仮想データでテスト", test_building);
 
         add_command("test", "テスト用コマンド", test);
 

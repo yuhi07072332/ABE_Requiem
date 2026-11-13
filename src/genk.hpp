@@ -7,6 +7,7 @@
 #include <iosfwd>
 #include <cstdint>
 
+/// VRMLでの座標を表す
 struct Point {
     int x, z;
     double y;
@@ -16,6 +17,9 @@ struct Point {
 struct Coord {
     int i, j;
 
+    // 大小比較, ==, !=演算子
+    auto operator<=>(const Coord&) const = default;
+
     // +-演算子
     Coord operator+(Coord other) const { return {i + other.i, j + other.j}; }
     Coord operator-(Coord other) const { return {i - other.i, j - other.j}; }
@@ -23,7 +27,7 @@ struct Coord {
 
 // 点の種類
 enum class Type : uint8_t {
-    Unknown,                // 未知
+    Unknown = 0,                // 未知
     Ground,                 // 地面
     Building,               // 建物
     BuildingOutline,        // 建物(輪郭)
@@ -58,19 +62,33 @@ struct MapData {
     Point point_at(Coord c) const { return point_at(c.i, c.j); }
 
     /// i行j列のTypeを取得
+    const Type& type_at(int i, int j) const { return types.at(i * cols + j); }
+    const Type& type_at(Coord c) const { return types.at(c.i * cols + c.j); }
     Type& type_at(int i, int j) { return types.at(i * cols + j); }
     Type& type_at(Coord c) { return types.at(c.i * cols + c.j); }
 
     /// i行j列の点が欠損点かどうかを判定
     bool is_missing(int i, int j) const { return std::isnan(at(i, j)); }
     bool is_missing(Coord c) const { return is_missing(c.i, c.j); }
+
+    // i行j列の点がMapData範囲内に入っているか
+    bool contains(int i, int j) const {
+        return i >= 0 && i < rows && j >= 0 && j < cols;
+    }
+    bool contains(Coord c) const { return contains(c.i, c.j); }
 };
+
+/* ----- utility ----- */
+
+std::ostream& operator<<(std::ostream&, Coord);
+std::ostream& operator<<(std::ostream&, Point);
+
+void show_mapdata_types(const MapData& data);
 
 /* ----- algorithm ----- */
 
 std::map<int, int> calc_frequency(const std::vector<double>& heights,
                                   int width = 5);
-std::vector<Coord> find_ground(const MapData& data);
 
 /// 欠損点補完
 void fill_missing(MapData& data);
@@ -89,3 +107,11 @@ int write_delaunay_triangulation(std::ostream& os,
 /* ----- input ----- */
 
 MapData read_map(std::string_view data_path);
+
+/* ----- building ----- */
+
+void test_building_algor();
+
+/* ----- clあssいfAI ----- */
+
+void classify_map(MapData& data);
