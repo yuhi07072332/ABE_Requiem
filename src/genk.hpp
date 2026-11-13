@@ -15,6 +15,10 @@ struct Point {
 /// 行列内の位置を表す
 struct Coord {
     int i, j;
+
+    // +-演算子
+    Coord operator+(Coord other) const { return {i + other.i, j + other.j}; }
+    Coord operator-(Coord other) const { return {i - other.i, j - other.j}; }
 };
 
 // 点の種類
