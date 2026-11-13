@@ -27,7 +27,7 @@ struct Coord {
 
 // 点の種類
 enum class Type : uint8_t {
-    Unknown,                // 未知
+    Unknown = 0,                // 未知
     Ground,                 // 地面
     Building,               // 建物
     BuildingOutline,        // 建物(輪郭)
@@ -75,6 +75,13 @@ struct MapData {
     bool contains(Coord c) const { return contains(c.i, c.j); }
 };
 
+/* ----- utility ----- */
+
+std::ostream& operator<<(std::ostream&, Coord);
+std::ostream& operator<<(std::ostream&, Point);
+
+void show_mapdata_types(const MapData& data);
+
 /* ----- algorithm ----- */
 
 std::map<int, int> calc_frequency(const std::vector<double>& heights,
@@ -98,9 +105,6 @@ MapData read_map(std::string_view data_path);
 /* ----- building ----- */
 
 void test_building_algor();
-
-std::ostream& operator<<(std::ostream&, Coord);
-std::ostream& operator<<(std::ostream&, Point);
 
 /* ----- clあssいfAI ----- */
 

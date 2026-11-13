@@ -37,8 +37,10 @@ void test_building() {
     test_building_algor();
 }
 
-void test() {
-    
+void test(const Option& opt) {
+    MapData data = read_map(opt.input_file);
+    classify_map(data);
+    show_mapdata_types(data);
 }
 
 // ┌                                                         ┐

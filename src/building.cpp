@@ -251,16 +251,6 @@ static void simplify_outline(Building& building, std::vector<Coord>& outline_pat
     }
 }
 
-std::ostream& operator<<(std::ostream& os, Coord c) {
-    os << '(' << c.i << ", " << c.j << ')';
-    return os;
-}
-
-std::ostream& operator<<(std::ostream& os, Point p) {
-    os << '(' << p.x << ", " << p.y << ", " << p.z << ')';
-    return os;
-}
-
 // ──────────────────────────────── test ─────────────────────────────
 
 static constexpr int TEST_DATA_SIZE = 32;
