@@ -1,3 +1,4 @@
+#include <iostream>
 #include <exception>
 #include <format>
 #include <fstream>
@@ -37,8 +38,23 @@ void test_building() {
     test_building_algor();
 }
 
-void test() {
-    
+void test(const Option& opt) {
+    MapData data = read_map(opt.input_file);
+
+    auto count_valid = [](const MapData& d) {
+        return std::count_if(d.grid.begin(), d.grid.end(), [](double y) {
+            return !std::isnan(y);
+        });
+    };
+
+    size_t before = count_valid(data);
+    downsample_flat_points(data, 3, 0.1);
+    size_t after = count_valid(data);
+
+    std::println("ファイル: {}", opt.input_file);
+    std::println("処理前: {} 点", before);
+    std::println("処理後: {} 点", after);
+    std::println("削減数: {} 点", before - after);
 }
 
 // ┌                                                         ┐
