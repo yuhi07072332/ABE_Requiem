@@ -1,16 +1,18 @@
 """
 Usage: visualizer.py <MapDataのデータファイル>
 """
-
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap, BoundaryNorm
+import sys
+from matplotlib.colors import ListedColormap
 
-data = np.loadtxt(sys.argv[1], dtype=np.uint8)
+with open(sys.argv[1]) as f:
+    rows, cols = map(int, f.readline().split())
+    data = np.loadtxt(f, dtype=np.uint8)
 
-# 値ごとの色
-cmap = ListedColormap(["white", "blue", "red"])
+data = data.reshape(rows, cols)
+
+cmap = ListedColormap(["white", "blue", "red", "green"])
 
 fig, ax = plt.subplots(figsize=(10, 10))
 
@@ -22,7 +24,6 @@ im = ax.imshow(
     interpolation="nearest"
 )
 
-# カラーバー
-fig.colorbar(im, ax=ax, ticks=[0, 1, 2])
+fig.colorbar(im, ax=ax, ticks=[0, 1, 2, 3])
 
 plt.show()

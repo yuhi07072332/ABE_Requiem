@@ -27,7 +27,7 @@ struct Coord {
 
 // 点の種類
 enum class Type : uint8_t {
-    Unknown,                // 未知
+    Unknown = 0,                // 未知
     Ground,                 // 地面
     Building,               // 建物
     BuildingOutline,        // 建物(輪郭)

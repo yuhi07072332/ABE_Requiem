@@ -19,13 +19,17 @@ std::ostream& operator<<(std::ostream& os, Point p) {
 
 /// @brief MapDataのtype行列をtypes.datに出力
 void show_mapdata_types(const MapData& data) {
-    std::ofstream ofs{"types.dat"};
+    {
+        std::ofstream ofs{"types.dat"};
+        std::println(ofs, "{} {}", data.rows, data.cols);
 
-    for (int i = 0; i < data.rows; ++i) {
-        for (int j = 0; j < data.cols; ++j) {
-            std::print(ofs, "{} ", static_cast<int>(data.type_at(i, j)));
+        for (int i = 0; i < data.rows; ++i) {
+            for (int j = 0; j < data.cols; ++j) {
+                std::print(ofs, "{} ", static_cast<int>(data.type_at(i, j)));
+            }
+            std::print(ofs, "\n");
         }
-        std::print(ofs, "\n");
+        ofs.close();
     }
 
     std::system("python ./tools/visualizer.py ./types.dat");
