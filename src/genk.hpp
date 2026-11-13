@@ -101,3 +101,7 @@ void test_building_algor();
 
 std::ostream& operator<<(std::ostream&, Coord);
 std::ostream& operator<<(std::ostream&, Point);
+
+/* ----- clあssいfAI ----- */
+
+void classify_map(MapData& data);
