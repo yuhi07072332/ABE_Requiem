@@ -1,6 +1,7 @@
 #include <array>
 #include <queue>
 #include <vector>
+#include <algorithm>
 
 #include "genk.hpp"
 
@@ -20,7 +21,7 @@ void fill_missing(MapData& data) {
     };
 
     std::queue<Coord> missing_queue;
-    
+
     std::vector<std::vector<bool>> queued(
         data.rows,
         std::vector<bool>(data.cols, false)
@@ -50,6 +51,28 @@ void fill_missing(MapData& data) {
     }
 
 
-    
+    // 幅優先探索で欠損点を補完
+    while (!missing_queue.empty()) {
+        Coord current = missing_queue.front();
+        missing_queue.pop();
 
+        std::vector<double> heights;
+
+        for (Coord dir : dirs) {
+            Coord neighbor = current + dir;
+
+            if (neighbor.i < 0 || neighbor.i >= data.rows) continue;
+            if (neighbor.j < 0 || neighbor.j >= data.cols) continue;
+
+            if (!data.is_missing(neighbor)) {
+                heights.push_back(data.at(neighbor));
+            }
+        }
+
+        std::sort(heights.begin(), heights.end());
+        if (heights.empty()) continue;
+
+        double median = heights.at(heights.size() / 2);
+        data.at(current) = median;
+    }
 }

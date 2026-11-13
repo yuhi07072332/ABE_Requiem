@@ -47,6 +47,9 @@ struct MapData {
     /// i行j列のz座標を取得
     double at(int i, int j) const { return grid.at(i * cols + j); }
     double at(Coord c) const { return grid.at(c.i * cols + c.j); }
+    /// i行j列のz座標を取得(書き換え可能)
+    double& at(int i, int j) { return grid.at(i * cols + j); }
+    double& at(Coord c) { return grid.at(c.i * cols + c.j); }
 
     /// i行j列に対応するPointを取得
     Point point_at(int i, int j) const {
