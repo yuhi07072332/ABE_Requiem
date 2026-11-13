@@ -1,5 +1,6 @@
 #include <array>
 #include <queue>
+#include <vector>
 
 #include "genk.hpp"
 
@@ -19,6 +20,11 @@ void fill_missing(MapData& data) {
     };
 
     std::queue<Coord> missing_queue;
+    
+    std::vector<std::vector<bool>> queued(
+        data.rows,
+        std::vector<bool>(data.cols, false)
+    );
 
 
     // 欠損点の座標をキューに入れる
@@ -36,6 +42,7 @@ void fill_missing(MapData& data) {
 
                 if (!data.is_missing(neighbor)) {
                     missing_queue.push(current);
+                    queued.at(current.i).at(current.j) = true;
                     break;
                 }
             }
