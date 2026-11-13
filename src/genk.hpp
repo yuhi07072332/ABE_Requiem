@@ -72,6 +72,9 @@ std::map<int, int> calc_frequency(const std::vector<double>& heights,
                                   int width = 5);
 std::vector<Coord> find_ground(const MapData& data);
 
+/// 欠損点補完
+void fill_missing(MapData& data);
+
 
 /* ----- vrml ----- */
 

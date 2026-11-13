@@ -74,7 +74,7 @@ void fill_missing(MapData& data) {
         std::sort(heights.begin(), heights.end());
         if (heights.empty()) continue;
 
-        double median = heights.at(heights.size() / 2);
+        double median = heights.at(heights.size() / 2);    //偶数個の場合は中央2値のうち大きい方を使用
         data.at(current) = median;
 
         
