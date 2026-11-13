@@ -42,8 +42,10 @@ void fill_missing(MapData& data) {
                 if (neighbor.j < 0 || neighbor.j >= data.cols) continue;
 
                 if (!data.is_missing(neighbor)) {
-                    missing_queue.push(current);
-                    queued.at(current.i).at(current.j) = true;
+                    if (!queued.at(current.i).at(current.j)) {
+                        missing_queue.push(current);
+                        queued.at(current.i).at(current.j) = true;
+                    }
                     break;
                 }
             }
@@ -74,5 +76,20 @@ void fill_missing(MapData& data) {
 
         double median = heights.at(heights.size() / 2);
         data.at(current) = median;
+
+        
+        // 補完した欠損点の8近傍を調べ、欠損点でキューに入っていないものを入れる
+        for (Coord dir : dirs) {
+            Coord neighbor = current + dir;
+
+            if (neighbor.i < 0 || neighbor.i >= data.rows) continue;
+            if (neighbor.j < 0 || neighbor.j >= data.cols) continue;
+
+            if (!data.is_missing(neighbor)) continue;
+            if (queued.at(neighbor.i).at(neighbor.j)) continue;
+
+            missing_queue.push(neighbor);
+            queued.at(neighbor.i).at(neighbor.j) = true;
+        }
     }
 }
