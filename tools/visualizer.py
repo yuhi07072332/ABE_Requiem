@@ -1,10 +1,10 @@
 """
 Usage: visualizer.py <MapDataのデータファイル>
 """
-import matplotlib.pyplot as plt
-import numpy as np
+
 import sys
-from matplotlib.colors import ListedColormap
+import napari
+import numpy as np
 
 with open(sys.argv[1]) as f:
     rows, cols = map(int, f.readline().split())
@@ -12,18 +12,29 @@ with open(sys.argv[1]) as f:
 
 data = data.reshape(rows, cols)
 
-cmap = ListedColormap(["white", "blue", "red", "green"])
+# 値と色の対応
+colors = {
+    1: "blue",
+    2: "red",
+    3: "green",
+}
 
-fig, ax = plt.subplots(figsize=(10, 10))
+viewer = napari.Viewer()
 
-im = ax.imshow(
-    data,
-    cmap=cmap,
-    vmin=-0.5,
-    vmax=3.5,
-    interpolation="nearest"
+# 0を白色で表示するための背景
+viewer.add_image(
+    np.full(data.shape, 255, dtype=np.uint8),
+    name="Background",
+    colormap="gray",
+    contrast_limits=(0, 255),
 )
 
-fig.colorbar(im, ax=ax, ticks=[0, 1, 2, 3])
+# 整数値による色分け
+viewer.add_labels(
+    data,
+    name="MapData Types",
+    colormap=colors,
+    opacity=1.0,
+)
 
-plt.show()
+napari.run()
