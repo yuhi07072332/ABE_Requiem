@@ -37,10 +37,53 @@ void test_building() {
     test_building_algor();
 }
 
-void test(const Option& opt) {
+void show_classify(const Option& opt) {
     MapData data = read_map(opt.input_file);
     classify_map(data);
     show_mapdata_types(data);
+}
+
+void all(const Option& opt) {
+    MapData data = read_map(opt.input_file);
+    auto ofs = open_output_file(opt);
+
+    std::println("{}", "分類" | deco::bold | deco::fg(deco::bright_yellow));
+    classify_map(data);
+
+    std::println("{}", "欠損点補間" | deco::bold | deco::fg(deco::bright_yellow));
+    fill_missing(data);
+
+    std::println("{}", "建物処理" | deco::bold | deco::fg(deco::bright_yellow));
+    auto buildings = process_building(data);
+
+    std::vector<Coord> ground_coords;
+
+    for (int i = 0; i < data.rows; ++i) { 
+        for (int j = 0; j < data.cols; ++j) {
+            switch (data.type_at(i, j)) {
+                case Type::Ground: 
+                case Type::Unknown: ground_coords.emplace_back(i, j);
+                    break;
+                default: break;
+            }
+        }
+    }
+
+    std::println("VRML: 地面");
+    
+    std::println(ofs, VRML_HEADER);
+    write_delaunay_triangulation(ofs, ground_coords, data, "1 0.5 0.25");
+
+    std::println("VRML: 建物");
+    for (const auto& building : buildings) {
+        write_building(ofs, data, building, "0.25 0.5 1");
+    }
+
+    std::println("{} に出力しました",
+                 opt.output_file | deco::fg(deco::bright_yellow));
+}
+
+void test() {
 }
 
 // ┌                                                         ┐
@@ -54,6 +97,9 @@ int main(int argc, const char** argv) {
             "report-heights", "点群の高さの度数分布表を表示", report_heights);
         add_command("gen-points", "地図データから点群を直接出力", gen_points);
         add_command("test-building", "建物に関する処理を仮想データでテスト", test_building);
+        add_command("show-classify", "classifyの結果を図示", show_classify);
+
+        add_command("all", "すべてのアルゴリズムを実行", all);
 
         add_command("test", "テスト用コマンド", test);
 

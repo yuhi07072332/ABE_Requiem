@@ -1,11 +1,3 @@
-/*#include <print>
-#include "genk.hpp"
-
-void classify_map(MapData& data){
-    std::println("classify_mapが呼ばれました（行数: {}, 列数: {}）", data.rows, data.cols);
-}*/
-
-
 #include <algorithm>
 #include <cmath>
 #include <cstdint>

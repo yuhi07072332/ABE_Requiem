@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <limits>
 #include <mdspan>
 #include <optional>
 #include <print>
@@ -45,28 +44,19 @@ constexpr std::array<Coord, 8> n8_dirs = {{
     {-1, -1},
 }};
 
+void Building::append(Coord c) {
+    coords.insert(c);
+    top_left.i = std::min(top_left.i, c.i);
+    top_left.j = std::min(top_left.j, c.j);
+    bottom_right.i = std::max(bottom_right.i, c.i);
+    bottom_right.j = std::max(bottom_right.j, c.j);
+}
+
 // clang-format on
 
 bool is_n4(Coord dir) { return dir.i == 0 || dir.j == 0; }
 
 auto indices(auto a, auto b) { return views::iota(decltype(b)(a), b); }
-
-struct Building {
-    std::set<Coord> coords;
-    std::vector<std::vector<Coord>> outline_paths;
-
-    Coord top_left = {std::numeric_limits<int>::max(),
-                      std::numeric_limits<int>::max()};
-    Coord bottom_right = {0, 0};
-
-    void push_back(Coord c) {
-        coords.insert(c);
-        top_left.i = std::min(top_left.i, c.i);
-        top_left.j = std::min(top_left.j, c.j);
-        bottom_right.i = std::max(bottom_right.i, c.i);
-        bottom_right.j = std::max(bottom_right.j, c.j);
-    }
-};
 
 /// @brief 建物の輪郭検出を行う
 static void find_building_outline(MapData& data) {
@@ -106,7 +96,7 @@ static Building bfs_building(const MapData& data,
         Coord c = queue.front();
         queue.pop();
 
-        building.push_back(c);
+        building.append(c);
 
         for (Coord dc : n4_dirs) {
             Coord nc = c + dc;
@@ -149,7 +139,7 @@ struct TraceState {
     Coord current;
     Coord backtrack;
 
-    bool operator==(const TraceState&) const = default;
+    auto operator<=>(const TraceState&) const = default;
 };
 
 static std::optional<TraceState> trace_next(TraceState state,
@@ -169,15 +159,17 @@ static std::optional<TraceState> trace_next(TraceState state,
 
     for (int i : indices(0, n8_dirs.size())) {
         int dir = (b_dir + i + 1) % 8;
-        Coord nc = current + n8_dirs[dir];
+        Coord nc = current + n8_dirs.at(dir);
 
         if (!data.contains(nc) || data.type_at(nc) != Type::BuildingOutline)
             continue;
         if (visited.contains(nc)) continue;
 
         int prev_dir = (dir + 7) % 8;
-        return TraceState {.current = nc,
-                           .backtrack = current + n8_dirs[prev_dir]};
+        return TraceState {
+            .current = nc,
+            .backtrack = current + n8_dirs.at(prev_dir)
+        };
     }
 
     return std::nullopt;
@@ -192,38 +184,44 @@ static std::vector<Coord> mnt(const MapData& data,
                               const std::set<Coord>& visited) {
     assert(data.type_at(begin) == Type::BuildingOutline);
 
-    TraceState init_state = {.current = begin,
-                             .backtrack = begin - Coord {0, 1}};
+    // 輪郭が閉曲線じゃない場合の無限ループを防ぐため、stateが重複しているかどうかも判定する
+    std::set<TraceState> visited_state;
+
+    TraceState init_state = {
+        .current = begin,
+        .backtrack = begin - Coord {0, 1}
+    };
 
     std::vector<Coord> outline_coords = {begin};
 
     std::optional<TraceState> curr_state = init_state;
-    while (true) {
-        auto next_state = trace_next(*curr_state, data, visited);
-        if (!next_state.has_value()) break;
-        if (*next_state == init_state) break;
 
-        outline_coords.push_back(next_state->current);
-        curr_state = next_state;
+    while (true) {
+        if (auto [_, inserted] = visited_state.insert(*curr_state); !inserted) break;
+        curr_state = trace_next(*curr_state, data, visited);
+        if (!curr_state.has_value()) break;
+        if (*curr_state == init_state) break;
+
+        outline_coords.push_back(curr_state->current);
     }
 
     return outline_coords;
 }
 
 /// @brief Buildingの全ての輪郭を時計回りの閉路としてoutline_pathsに格納
+///
+/// 輪郭が閉曲線じゃなかった場合は閉路ではなくパスとなる
 static void scan_outlines(const MapData& data, Building& building) {
     std::set<Coord> visited;
 
-    for (int i = building.top_left.i; i < building.bottom_right.i; ++i) {
-        for (int j = building.top_left.j; j < building.bottom_right.j; ++j) {
+    for (int i = building.top_left.i; i <= building.bottom_right.i; ++i) {
+        for (int j = building.top_left.j; j <= building.bottom_right.j; ++j) {
             Coord c = {i, j};
             if (visited.contains(c)) continue;
             if (data.type_at(c) == Type::BuildingOutline
                 && building.coords.contains(c)) {
                 auto outline = mnt(data, c, visited);
-                for (Coord c : outline) {
-                    visited.insert(c);
-                }
+                for (Coord c : outline) visited.insert(c);
                 building.outline_paths.emplace_back(std::move(outline));
             }
         }
@@ -236,12 +234,12 @@ static void simplify_outline(Building& building, std::vector<Coord>& outline_pat
 
     std::set<Coord> vertices { outline_path.front() };
 
-    Coord prev_dir = outline_path[1] - outline_path[0];
+    Coord prev_dir = outline_path.at(1) - outline_path.at(0);
 
     for (std::size_t i = 0; i < outline_path.size(); ++i) {
-        const Coord dir = outline_path[(i + 1) % outline_path.size()]
-            - outline_path[i];
-        if (dir != prev_dir) vertices.insert(outline_path[i]);
+        const Coord dir = outline_path.at((i + 1) % outline_path.size())
+            - outline_path.at(i);
+        if (dir != prev_dir) vertices.insert(outline_path.at(i));
         prev_dir = dir;
     }
 
@@ -249,6 +247,23 @@ static void simplify_outline(Building& building, std::vector<Coord>& outline_pat
         | views::filter([&](Coord c){ return !vertices.contains(c); })) {
         building.coords.erase(c);
     }
+}
+
+std::vector<Building> process_building(MapData& data) {
+    find_building_outline(data);
+    auto buildings = ccl_buildings(data);
+    std::println("建物検出: {}個", buildings.size());
+    std::println("建物削減中...");
+    for (auto [n, building] : buildings | views::enumerate) {
+        // std::println("建物{}: {}, {} -> {}, {}", n, building.top_left.i, building.top_left.j, building.bottom_right.i, building.bottom_right.j);
+        scan_outlines(data, building);
+        // std::println("輪郭数: {}", building.outline_paths.size());
+        for (const auto [i, outline_path] :
+             building.outline_paths | views::enumerate) {
+            simplify_outline(building, outline_path);
+        }
+    }
+    return buildings;
 }
 
 // ──────────────────────────────── test ─────────────────────────────
@@ -285,10 +300,10 @@ static consteval auto test_type_grid() {
     0b00000000000000000111111111111100,
     0b00000000000000001111000000011110,
     0b00000000000000001110001110001110,
-    0b00000000000000001110011111001110,
+    0b00001000000000001110011111001110,
     0b00000000000000001110001111001110,
     0b00000000000000001111000000011110,
-    0b00000000000000000111111111111100,
+    0b01111111111110000111111111111100,
     0b00000000000000000001111111110000,
     0b00000000000000000000000000000000,
         // clang-format on
@@ -405,6 +420,7 @@ void test_building_algor() {
 
         print_building(type_grid, building);
         scan_outlines(data, building);
+        std::println("輪郭数: {}", building.outline_paths.size());
         for (const auto [i, outline_path] :
              building.outline_paths | views::enumerate) {
             std::println("\n輪郭{}: \n", i + 1);
