@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <limits>
 #include <mdspan>
 #include <optional>
 #include <print>
@@ -132,7 +131,7 @@ struct TraceState {
     Coord current;
     Coord backtrack;
 
-    bool operator==(const TraceState&) const = default;
+    auto operator<=>(const TraceState&) const = default;
 };
 
 static std::optional<TraceState> trace_next(TraceState state,
@@ -152,7 +151,7 @@ static std::optional<TraceState> trace_next(TraceState state,
 
     for (int i : indices(0, n8_dirs.size())) {
         int dir = (b_dir + i + 1) % 8;
-        Coord nc = current + n8_dirs[dir];
+        Coord nc = current + n8_dirs.at(dir);
 
         if (!data.contains(nc) || data.type_at(nc) != Type::BuildingOutline)
             continue;
@@ -161,7 +160,7 @@ static std::optional<TraceState> trace_next(TraceState state,
         int prev_dir = (dir + 7) % 8;
         return TraceState {
             .current = nc,
-            .backtrack = current + n8_dirs[prev_dir]
+            .backtrack = current + n8_dirs.at(prev_dir)
         };
     }
 
@@ -174,23 +173,26 @@ static std::optional<TraceState> trace_next(TraceState state,
 /// https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/moore.html
 static std::vector<Coord> mnt(const MapData& data,
                               Coord begin,
-                              std::set<Coord>& visited) {
+                              const std::set<Coord>& visited) {
     assert(data.type_at(begin) == Type::BuildingOutline);
 
-    TraceState init_state = {.current = begin,
-                             .backtrack = begin - Coord {0, 1}};
+    // 輪郭が閉曲線じゃない場合の無限ループを防ぐため、stateが重複しているかどうかも判定する
+    std::set<TraceState> visited_state;
+
+    TraceState init_state = {
+        .current = begin,
+        .backtrack = begin - Coord {0, 1}
+    };
 
     std::vector<Coord> outline_coords = {begin};
 
     std::optional<TraceState> curr_state = init_state;
-    visited.insert(curr_state->current);
 
     while (true) {
+        if (auto [_, inserted] = visited_state.insert(*curr_state); !inserted) break;
         curr_state = trace_next(*curr_state, data, visited);
         if (!curr_state.has_value()) break;
         if (*curr_state == init_state) break;
-
-        visited.insert(curr_state->current);
 
         outline_coords.push_back(curr_state->current);
     }
@@ -199,16 +201,19 @@ static std::vector<Coord> mnt(const MapData& data,
 }
 
 /// @brief Buildingの全ての輪郭を時計回りの閉路としてoutline_pathsに格納
+///
+/// 輪郭が閉曲線じゃなかった場合は閉路ではなくパスとなる
 static void scan_outlines(const MapData& data, Building& building) {
     std::set<Coord> visited;
 
-    for (int i = building.top_left.i; i < building.bottom_right.i; ++i) {
-        for (int j = building.top_left.j; j < building.bottom_right.j; ++j) {
+    for (int i = building.top_left.i; i <= building.bottom_right.i; ++i) {
+        for (int j = building.top_left.j; j <= building.bottom_right.j; ++j) {
             Coord c = {i, j};
             if (visited.contains(c)) continue;
             if (data.type_at(c) == Type::BuildingOutline
                 && building.coords.contains(c)) {
                 auto outline = mnt(data, c, visited);
+                for (Coord c : outline) visited.insert(c);
                 building.outline_paths.emplace_back(std::move(outline));
             }
         }
@@ -242,7 +247,9 @@ std::vector<Building> process_building(MapData& data) {
     std::println("建物検出: {}個", buildings.size());
     std::println("建物削減中...");
     for (auto [n, building] : buildings | views::enumerate) {
+        // std::println("建物{}: {}, {} -> {}, {}", n, building.top_left.i, building.top_left.j, building.bottom_right.i, building.bottom_right.j);
         scan_outlines(data, building);
+        // std::println("輪郭数: {}", building.outline_paths.size());
         for (const auto [i, outline_path] :
              building.outline_paths | views::enumerate) {
             simplify_outline(building, outline_path);
@@ -285,10 +292,10 @@ static consteval auto test_type_grid() {
     0b00000000000000000111111111111100,
     0b00000000000000001111000000011110,
     0b00000000000000001110001110001110,
-    0b00000000000000001110011111001110,
+    0b00001000000000001110011111001110,
     0b00000000000000001110001111001110,
     0b00000000000000001111000000011110,
-    0b00000000000000000111111111111100,
+    0b01111111111110000111111111111100,
     0b00000000000000000001111111110000,
     0b00000000000000000000000000000000,
         // clang-format on
@@ -405,6 +412,7 @@ void test_building_algor() {
 
         print_building(type_grid, building);
         scan_outlines(data, building);
+        std::println("輪郭数: {}", building.outline_paths.size());
         for (const auto [i, outline_path] :
              building.outline_paths | views::enumerate) {
             std::println("\n輪郭{}: \n", i + 1);

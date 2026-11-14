@@ -68,10 +68,13 @@ void all(const Option& opt) {
         }
     }
 
+    std::println("VRML: 地面");
     write_delaunay_triangulation(ofs, ground, data, "255 125 64");
 
+    std::println("VRML: 建物");
     for (const auto& building : buildings) {
         std::vector<Coord> coords{building.coords.begin(), building.coords.end()};
+        std::println("delunay");
         write_delaunay_triangulation(ofs, coords, data, "64 125 255");
     }
 }
