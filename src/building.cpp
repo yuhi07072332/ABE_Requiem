@@ -159,8 +159,10 @@ static std::optional<TraceState> trace_next(TraceState state,
         if (visited.contains(nc)) continue;
 
         int prev_dir = (dir + 7) % 8;
-        return TraceState {.current = nc,
-                           .backtrack = current + n8_dirs[prev_dir]};
+        return TraceState {
+            .current = nc,
+            .backtrack = current + n8_dirs[prev_dir]
+        };
     }
 
     return std::nullopt;
@@ -172,7 +174,7 @@ static std::optional<TraceState> trace_next(TraceState state,
 /// https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/moore.html
 static std::vector<Coord> mnt(const MapData& data,
                               Coord begin,
-                              const std::set<Coord>& visited) {
+                              std::set<Coord>& visited) {
     assert(data.type_at(begin) == Type::BuildingOutline);
 
     TraceState init_state = {.current = begin,
@@ -181,13 +183,16 @@ static std::vector<Coord> mnt(const MapData& data,
     std::vector<Coord> outline_coords = {begin};
 
     std::optional<TraceState> curr_state = init_state;
-    while (true) {
-        auto next_state = trace_next(*curr_state, data, visited);
-        if (!next_state.has_value()) break;
-        if (*next_state == init_state) break;
+    visited.insert(curr_state->current);
 
-        outline_coords.push_back(next_state->current);
-        curr_state = next_state;
+    while (true) {
+        curr_state = trace_next(*curr_state, data, visited);
+        if (!curr_state.has_value()) break;
+        if (*curr_state == init_state) break;
+
+        visited.insert(curr_state->current);
+
+        outline_coords.push_back(curr_state->current);
     }
 
     return outline_coords;
@@ -204,9 +209,6 @@ static void scan_outlines(const MapData& data, Building& building) {
             if (data.type_at(c) == Type::BuildingOutline
                 && building.coords.contains(c)) {
                 auto outline = mnt(data, c, visited);
-                for (Coord c : outline) {
-                    visited.insert(c);
-                }
                 building.outline_paths.emplace_back(std::move(outline));
             }
         }
@@ -219,12 +221,12 @@ static void simplify_outline(Building& building, std::vector<Coord>& outline_pat
 
     std::set<Coord> vertices { outline_path.front() };
 
-    Coord prev_dir = outline_path[1] - outline_path[0];
+    Coord prev_dir = outline_path.at(1) - outline_path.at(0);
 
     for (std::size_t i = 0; i < outline_path.size(); ++i) {
-        const Coord dir = outline_path[(i + 1) % outline_path.size()]
-            - outline_path[i];
-        if (dir != prev_dir) vertices.insert(outline_path[i]);
+        const Coord dir = outline_path.at((i + 1) % outline_path.size())
+            - outline_path.at(i);
+        if (dir != prev_dir) vertices.insert(outline_path.at(i));
         prev_dir = dir;
     }
 

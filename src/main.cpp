@@ -37,6 +37,12 @@ void test_building() {
     test_building_algor();
 }
 
+void show_classify(const Option& opt) {
+    MapData data = read_map(opt.input_file);
+    classify_map(data);
+    show_mapdata_types(data);
+}
+
 void all(const Option& opt) {
     MapData data = read_map(opt.input_file);
     auto ofs = open_output_file(opt);
@@ -84,6 +90,7 @@ int main(int argc, const char** argv) {
             "report-heights", "点群の高さの度数分布表を表示", report_heights);
         add_command("gen-points", "地図データから点群を直接出力", gen_points);
         add_command("test-building", "建物に関する処理を仮想データでテスト", test_building);
+        add_command("show-classify", "classifyの結果を図示", show_classify);
 
         add_command("all", "すべてのアルゴリズムを実行", all);
 
