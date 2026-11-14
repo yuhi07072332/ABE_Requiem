@@ -10,8 +10,7 @@
 
 /// VRMLでの座標を表す
 struct Point {
-    int x, z;
-    double y;
+    double x, y, z;
 };
 
 /// 行列内の位置を表す
@@ -58,7 +57,11 @@ struct MapData {
 
     /// i行j列に対応するPointを取得
     Point point_at(int i, int j) const {
-        return Point {x + j, z + i, at(i, j)};
+        return Point {
+            static_cast<double>(x) + j,
+            at(i, j),
+            static_cast<double>(z) + i
+        };
     }
     Point point_at(Coord c) const { return point_at(c.i, c.j); }
 
@@ -86,6 +89,24 @@ std::ostream& operator<<(std::ostream&, Point);
 
 void show_mapdata_types(const MapData& data);
 
+/* ----- building ----- */
+
+struct Building {
+    std::set<Coord> coords;
+    std::vector<std::vector<Coord>> outline_paths;
+
+    Coord top_left = {std::numeric_limits<int>::max(),
+                      std::numeric_limits<int>::max()};
+    Coord bottom_right = {0, 0};
+
+    void append(Coord c);
+};
+
+std::vector<Building> process_building(MapData& data);
+
+void test_building_algor();
+
+
 /* ----- algorithm ----- */
 
 std::map<int, int> calc_frequency(const std::vector<double>& heights,
@@ -107,32 +128,14 @@ int write_delaunay_triangulation(std::ostream& os,
                                  const MapData& data,
                                  std::string_view diffuse_color = "0.3 0.5 0.7");
 
+int write_building(std::ostream& os,
+                    const MapData& data,
+                    const Building& building,
+                    std::string_view diffuse_color = "0.3 0.5 0.7");
+
 /* ----- input ----- */
 
 MapData read_map(std::string_view data_path);
-
-/* ----- building ----- */
-
-struct Building {
-    std::set<Coord> coords;
-    std::vector<std::vector<Coord>> outline_paths;
-
-    Coord top_left = {std::numeric_limits<int>::max(),
-                      std::numeric_limits<int>::max()};
-    Coord bottom_right = {0, 0};
-
-    void push_back(Coord c) {
-        coords.insert(c);
-        top_left.i = std::min(top_left.i, c.i);
-        top_left.j = std::min(top_left.j, c.j);
-        bottom_right.i = std::max(bottom_right.i, c.i);
-        bottom_right.j = std::max(bottom_right.j, c.j);
-    }
-};
-
-std::vector<Building> process_building(MapData& data);
-
-void test_building_algor();
 
 /* ----- clあssいfAI ----- */
 

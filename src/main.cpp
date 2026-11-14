@@ -56,27 +56,31 @@ void all(const Option& opt) {
     std::println("{}", "建物処理" | deco::bold | deco::fg(deco::bright_yellow));
     auto buildings = process_building(data);
 
-    std::vector<Coord> ground;
+    std::vector<Coord> ground_coords;
 
     for (int i = 0; i < data.rows; ++i) { 
         for (int j = 0; j < data.cols; ++j) {
             switch (data.type_at(i, j)) {
                 case Type::Ground: 
-                case Type::Unknown: ground.emplace_back(i, j); break;
+                case Type::Unknown: ground_coords.emplace_back(i, j);
+                    break;
                 default: break;
             }
         }
     }
 
     std::println("VRML: 地面");
-    write_delaunay_triangulation(ofs, ground, data, "255 125 64");
+    
+    std::println(ofs, VRML_HEADER);
+    write_delaunay_triangulation(ofs, ground_coords, data, "1 0.5 0.25");
 
     std::println("VRML: 建物");
     for (const auto& building : buildings) {
-        std::vector<Coord> coords{building.coords.begin(), building.coords.end()};
-        std::println("delunay");
-        write_delaunay_triangulation(ofs, coords, data, "64 125 255");
+        write_building(ofs, data, building, "0.25 0.5 1");
     }
+
+    std::println("{} に出力しました",
+                 opt.output_file | deco::fg(deco::bright_yellow));
 }
 
 void test() {

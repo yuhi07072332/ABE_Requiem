@@ -44,6 +44,14 @@ constexpr std::array<Coord, 8> n8_dirs = {{
     {-1, -1},
 }};
 
+void Building::append(Coord c) {
+    coords.insert(c);
+    top_left.i = std::min(top_left.i, c.i);
+    top_left.j = std::min(top_left.j, c.j);
+    bottom_right.i = std::max(bottom_right.i, c.i);
+    bottom_right.j = std::max(bottom_right.j, c.j);
+}
+
 // clang-format on
 
 bool is_n4(Coord dir) { return dir.i == 0 || dir.j == 0; }
@@ -88,7 +96,7 @@ static Building bfs_building(const MapData& data,
         Coord c = queue.front();
         queue.pop();
 
-        building.push_back(c);
+        building.append(c);
 
         for (Coord dc : n4_dirs) {
             Coord nc = c + dc;
