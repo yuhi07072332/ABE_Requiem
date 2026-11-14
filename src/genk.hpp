@@ -87,7 +87,7 @@ struct MapData {
 std::ostream& operator<<(std::ostream&, Coord);
 std::ostream& operator<<(std::ostream&, Point);
 
-void show_mapdata_types(const MapData& data);
+void show_mapdata(const MapData& data);
 
 /* ----- building ----- */
 

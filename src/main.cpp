@@ -40,20 +40,22 @@ void test_building() {
 void show_classify(const Option& opt) {
     MapData data = read_map(opt.input_file);
     classify_map(data);
-    show_mapdata_types(data);
+    show_mapdata(data);
 }
 
 void all(const Option& opt) {
+    const deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
+
     MapData data = read_map(opt.input_file);
     auto ofs = open_output_file(opt);
 
-    std::println("{}", "分類" | deco::bold | deco::fg(deco::bright_yellow));
+    std::println("{}", "分類" | hl);
     classify_map(data);
 
-    std::println("{}", "欠損点補間" | deco::bold | deco::fg(deco::bright_yellow));
+    std::println("{}", "欠損点補間" | hl);
     fill_missing(data);
 
-    std::println("{}", "建物処理" | deco::bold | deco::fg(deco::bright_yellow));
+    std::println("{}", "建物処理" | hl);
     auto buildings = process_building(data);
 
     std::vector<Coord> ground_coords;
@@ -83,6 +85,23 @@ void all(const Option& opt) {
                  opt.output_file | deco::fg(deco::bright_yellow));
 }
 
+void all_show(const Option& opt) {
+    const deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
+
+    MapData data = read_map(opt.input_file);
+
+    std::println("{}", "分類" | hl);
+    classify_map(data);
+
+    std::println("{}", "欠損点補間" | hl);
+    fill_missing(data);
+
+    std::println("{}", "建物処理" | hl);
+    auto buildings = process_building(data);
+
+    show_mapdata(data);
+}
+
 void test() {
 }
 
@@ -99,7 +118,8 @@ int main(int argc, const char** argv) {
         add_command("test-building", "建物に関する処理を仮想データでテスト", test_building);
         add_command("show-classify", "classifyの結果を図示", show_classify);
 
-        add_command("all", "すべてのアルゴリズムを実行", all);
+        add_command("all", "すべてのアルゴリズムとVRML化を実行", all);
+        add_command("all-show", "すべてのアルゴリズム実行し、VRML化をせずvisualizerを起動", all_show);
 
         add_command("test", "テスト用コマンド", test);
 

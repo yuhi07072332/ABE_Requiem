@@ -2,6 +2,7 @@
 #include <fstream>
 #include <print>
 #include <cstdlib>
+#include <filesystem>
 
 #include "genk.hpp"
 
@@ -16,21 +17,19 @@ std::ostream& operator<<(std::ostream& os, Point p) {
     return os;
 }
 
+/// @brief MapDataのtype行列を図示し保存する(./tools/visualizer.pyを実行する)
+void show_mapdata(const MapData& data) {
+    std::ofstream ofs{"mapdata_temp.dat"};
+    std::println(ofs, "{} {}", data.rows, data.cols);
 
-/// @brief MapDataのtype行列をtypes.datに出力
-void show_mapdata_types(const MapData& data) {
-    {
-        std::ofstream ofs{"types.dat"};
-        std::println(ofs, "{} {}", data.rows, data.cols);
-
-        for (int i = 0; i < data.rows; ++i) {
-            for (int j = 0; j < data.cols; ++j) {
-                std::print(ofs, "{} ", static_cast<int>(data.type_at(i, j)));
-            }
-            std::print(ofs, "\n");
+    for (int i = 0; i < data.rows; ++i) {
+        for (int j = 0; j < data.cols; ++j) {
+            std::print(ofs, "{} ", static_cast<int>(data.type_at(i, j)));
         }
-        ofs.close();
+        std::print(ofs, "\n");
     }
+    ofs.close();
 
-    std::system("python ./tools/visualizer.py ./types.dat");
+    std::system("python ./tools/visualizer.py ./mapdata_temp.dat");
+    std::filesystem::remove("./mapdata_temp.dat");
 }

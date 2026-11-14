@@ -3,38 +3,85 @@ Usage: visualizer.py <MapDataのデータファイル>
 """
 
 import sys
-import napari
+
 import numpy as np
+import pyqtgraph as pg
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMainWindow
 
-with open(sys.argv[1]) as f:
-    rows, cols = map(int, f.readline().split())
-    data = np.loadtxt(f, dtype=np.uint8)
 
-data = data.reshape(rows, cols)
+def load_data(path):
+    with open(path) as f:
+        rows, cols = map(int, f.readline().split())
+        data = np.loadtxt(f, dtype=np.uint8)
 
-# 値と色の対応
-colors = {
-    1: "blue",
-    2: "red",
-    3: "green",
-}
+    return data.reshape(rows, cols)
 
-viewer = napari.Viewer()
 
-# 0を白色で表示するための背景
-viewer.add_image(
-    np.full(data.shape, 255, dtype=np.uint8),
-    name="Background",
-    colormap="gray",
-    contrast_limits=(0, 255),
-)
+def main():
+    data = load_data(sys.argv[1])
+    rows, cols = data.shape
 
-# 整数値による色分け
-viewer.add_labels(
-    data,
-    name="MapData Types",
-    colormap=colors,
-    opacity=1.0,
-)
+    colors = np.array([
+        [255, 255, 255],  # 0: white
+        [0, 0, 255],      # 1: blue
+        [255, 0, 0],      # 2: red
+        [0, 128, 0],      # 3: green
+    ], dtype=np.uint8)
 
-napari.run()
+    rgb = colors[data]
+
+    pg.setConfigOptions(imageAxisOrder="row-major")
+    app = pg.mkQApp("MapData Visualizer")
+
+    window = QMainWindow()
+    window.setWindowTitle("MapData Visualizer")
+
+    # 描画領域
+    graphics = pg.GraphicsLayoutWidget()
+    window.setCentralWidget(graphics)
+
+    # ViewBox: ズーム・パンを管理
+    view = graphics.addViewBox()
+    view.setAspectLocked(True)
+    view.invertY(True)
+
+    # 左ドラッグでパン
+    view.setMouseMode(pg.ViewBox.PanMode)
+    view.setMouseEnabled(x=True, y=True)
+
+    # ImageItem: 画像そのもの
+    image = pg.ImageItem(rgb, axisOrder="row-major")
+    view.addItem(image)
+
+    # 初期表示範囲
+    view.autoRange()
+
+    def on_mouse_moved(pos):
+        if not view.sceneBoundingRect().contains(pos):
+            window.statusBar().clearMessage()
+            return
+
+        point = image.mapFromScene(pos)
+
+        col = int(np.floor(point.x()))
+        row = int(np.floor(point.y()))
+
+        if 0 <= row < rows and 0 <= col < cols:
+            window.statusBar().showMessage(
+                f"Row: {row}    Col: {col}    Value: {data[row, col]}"
+            )
+        else:
+            window.statusBar().clearMessage()
+
+    graphics.scene().sigMouseMoved.connect(on_mouse_moved)
+
+    window.resize(1000, 800)
+    window.show()
+
+    pg.exec()
+
+
+if __name__ == "__main__":
+    main()
+
