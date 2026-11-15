@@ -147,7 +147,7 @@ void inspect(const Option& opt) {
     }
 
     // Pythonのビューアを起動
-    const int result = std::system("python ./inspector.py inspector_temp.dat");
+    const int result = std::system("python inspector.py inspector_temp.dat");
     std::filesystem::remove(temp_file);
     if (result != 0)
         throw std::runtime_error("inspect: integrated viewer failed to start");
