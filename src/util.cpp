@@ -30,6 +30,6 @@ void show_mapdata(const MapData& data) {
     }
     ofs.close();
 
-    std::system("python ./tools/visualizer.py ./mapdata_temp.dat");
+    std::system("python ./visualizer.py ./mapdata_temp.dat");
     std::filesystem::remove("./mapdata_temp.dat");
 }
