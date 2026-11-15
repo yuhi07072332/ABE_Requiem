@@ -106,6 +106,8 @@ void all_show(const Option& opt) {
 
 void inspect(const Option& opt) {
     const deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
+
+    // 入力ファイルが指定されていない場合はエラー
     if (opt.input_file.empty())
         throw std::runtime_error("inspect: input file is required");
 
@@ -114,6 +116,7 @@ void inspect(const Option& opt) {
     std::println("{}", "分類" | hl);
     classify_map(data);
 
+    // 元々欠損点だったかどうかを記録する配列
     std::vector<bool> originally_missing(data.rows * data.cols);
     for (int i = 0; i < data.rows; ++i) {
         for (int j = 0; j < data.cols; ++j) {
@@ -127,6 +130,7 @@ void inspect(const Option& opt) {
     std::println("{}", "建物処理" | hl);
     auto buildings = process_building(data);
 
+    // 一時ファイルにデータを保存
     constexpr const char* temp_file = "inspector_temp.dat";
     {
         std::ofstream ofs{temp_file};
@@ -142,6 +146,7 @@ void inspect(const Option& opt) {
         }
     }
 
+    // Pythonのビューアを起動
     const int result = std::system("python ./inspector.py inspector_temp.dat");
     std::filesystem::remove(temp_file);
     if (result != 0)
