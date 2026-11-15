@@ -1,6 +1,8 @@
 #include <exception>
 #include <format>
 #include <fstream>
+#include <cstdlib>
+#include <filesystem>
 #include <print>
 #include <string>
 
@@ -102,6 +104,41 @@ void all_show(const Option& opt) {
     show_mapdata(data);
 }
 
+void inspect(const Option& opt) {
+    const deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
+    if (opt.input_file.empty())
+        throw std::runtime_error("inspect: input file is required");
+
+    MapData data = read_map(opt.input_file);
+
+    std::println("{}", "分類" | hl);
+    classify_map(data);
+
+    std::println("{}", "欠損点補間" | hl);
+    fill_missing(data);
+
+    std::println("{}", "建物処理" | hl);
+    auto buildings = process_building(data);
+
+    constexpr const char* temp_file = "inspector_temp.dat";
+    {
+        std::ofstream ofs{temp_file};
+        std::println(ofs, "MAPDATA 1");
+        std::println(ofs, "{} {} {} {}", data.rows, data.cols, data.x, data.z);
+        for (int i = 0; i < data.rows; ++i) {
+            for (int j = 0; j < data.cols; ++j) {
+                std::println(ofs, "{} {}", data.at(i, j),
+                             static_cast<int>(data.type_at(i, j)));
+            }
+        }
+    }
+
+    const int result = std::system("python ./tools/inspector.py inspector_temp.dat");
+    std::filesystem::remove(temp_file);
+    if (result != 0)
+        throw std::runtime_error("inspect: integrated viewer failed to start");
+}
+
 void test() {
 }
 
@@ -120,6 +157,8 @@ int main(int argc, const char** argv) {
 
         add_command("all", "すべてのアルゴリズムとVRML化を実行", all);
         add_command("all-show", "すべてのアルゴリズム実行し、VRML化をせずvisualizerを起動", all_show);
+
+        add_command("inspect", "Launch integrated viewer with latest algorithm results", inspect);
 
         add_command("test", "テスト用コマンド", test);
 
