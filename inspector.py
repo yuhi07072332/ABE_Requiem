@@ -1,9 +1,3 @@
-"""2D elevation and classification viewer for ABE_Requiem.
-
-Usage:
-    python tools\\inspector.py <mapdata-file>
-"""
-
 import sys
 
 import numpy as np
