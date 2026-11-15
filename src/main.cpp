@@ -112,21 +112,19 @@ void test() {
 int main(int argc, const char** argv) {
     try {
         // コマンドを登録
+        add_command("all", "すべてのアルゴリズムとVRML化を実行", all);
+        add_command("all-show", "すべてのアルゴリズム実行し、VRML化をせずvisualizerを起動", all_show);
+
         add_command(
             "report-heights", "点群の高さの度数分布表を表示", report_heights);
         add_command("gen-points", "地図データから点群を直接出力", gen_points);
         add_command("test-building", "建物に関する処理を仮想データでテスト", test_building);
         add_command("show-classify", "classifyの結果を図示", show_classify);
 
-        add_command("all", "すべてのアルゴリズムとVRML化を実行", all);
-        add_command("all-show", "すべてのアルゴリズム実行し、VRML化をせずvisualizerを起動", all_show);
 
         add_command("test", "テスト用コマンド", test);
 
-        // コマンドライン引数(`argv`)を解析し、結果を`opt`に保存
         Option opt = parse_args(argc, argv);
-
-        // 指定されたコマンド実行
         run_command(opt);
     } catch (const std::exception& e) {
         return 1;
