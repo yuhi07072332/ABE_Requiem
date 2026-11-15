@@ -1,4 +1,4 @@
-#include <exception>
+﻿#include <exception>
 #include <format>
 #include <fstream>
 #include <cstdlib>
@@ -114,6 +114,13 @@ void inspect(const Option& opt) {
     std::println("{}", "分類" | hl);
     classify_map(data);
 
+    std::vector<bool> originally_missing(data.rows * data.cols);
+    for (int i = 0; i < data.rows; ++i) {
+        for (int j = 0; j < data.cols; ++j) {
+            originally_missing[i * data.cols + j] = data.is_missing(i, j);
+        }
+    }
+
     std::println("{}", "欠損点補間" | hl);
     fill_missing(data);
 
@@ -127,8 +134,10 @@ void inspect(const Option& opt) {
         std::println(ofs, "{} {} {} {}", data.rows, data.cols, data.x, data.z);
         for (int i = 0; i < data.rows; ++i) {
             for (int j = 0; j < data.cols; ++j) {
-                std::println(ofs, "{} {}", data.at(i, j),
-                             static_cast<int>(data.type_at(i, j)));
+                std::println(ofs, "{} {} {}",
+                             data.at(i, j),
+                             static_cast<int>(data.type_at(i, j)),
+                             originally_missing[i * data.cols + j] ? 1 : 0);
             }
         }
     }
@@ -158,7 +167,7 @@ int main(int argc, const char** argv) {
         add_command("all", "すべてのアルゴリズムとVRML化を実行", all);
         add_command("all-show", "すべてのアルゴリズム実行し、VRML化をせずvisualizerを起動", all_show);
 
-        add_command("inspect", "Launch integrated viewer with latest algorithm results", inspect);
+        add_command("inspect", "すべてのアルゴリズムを実行し、総合ビューアを起動", inspect);
 
         add_command("test", "テスト用コマンド", test);
 

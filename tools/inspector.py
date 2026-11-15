@@ -1,12 +1,10 @@
 """2D elevation and classification viewer for ABE_Requiem.
 
 Usage:
-    python tools\\inspector.py <point-data> [classification-data]
+    python tools\\inspector.py <mapdata-file>
 """
 
 import sys
-from collections import deque
-from pathlib import Path
 
 import numpy as np
 import pyqtgraph as pg
@@ -31,98 +29,27 @@ TYPE_NAMES = {0: "Unknown", 1: "Ground", 2: "Building", 3: "BuildingOutline"}
 TYPE_COLORS = np.array(
     [[255, 255, 255], [0, 0, 255], [255, 0, 0], [0, 180, 0]], dtype=np.uint8
 )
-N8 = tuple((di, dj) for di in (-1, 0, 1) for dj in (-1, 0, 1) if di or dj)
 
 
 def load_points(path):
     with open(path, encoding="utf-8-sig") as source:
         first_line = source.readline().split()
-        if first_line and first_line[0].lstrip("\uFEFF") == "MAPDATA":
-            rows, cols, origin_x, origin_z = map(int, source.readline().split()[:4])
-            values = np.loadtxt(source, dtype=float).reshape(rows * cols, 2)
-            heights = values[:, 0].reshape(rows, cols)
-            embedded_types = values[:, 1].astype(np.uint8).reshape(rows, cols)
-            return heights, origin_x, origin_z, embedded_types
-
-        points = []
-        if len(first_line) == 3:
-            points.append(tuple(map(float, first_line)))
-        elif first_line:
-            raise ValueError(f"{path}: x z y の3列が必要です")
-        for line_number, line in enumerate(source, 2):
-            if not line.strip():
-                continue
-            fields = line.split()
-            if len(fields) != 3:
-                raise ValueError(f"{path}:{line_number}: x z y の3列が必要です")
-            points.append(tuple(map(float, fields)))
-
-    if not points:
-        raise ValueError("点群データが空です")
-    min_x = int(min(point[0] for point in points))
-    max_x = int(max(point[0] for point in points))
-    min_z = int(min(point[1] for point in points))
-    max_z = int(max(point[1] for point in points))
-    rows, cols = max_z - min_z + 1, max_x - min_x + 1
-    heights = np.full((rows, cols), np.nan)
-    for x, z, y in points:
-        row = rows - 1 - (int(z) - min_z)
-        col = int(x) - min_x
-        if y != -9999.99:
-            heights[row, col] = y
-    return heights, min_x, min_z, None
-
-def load_types(path, shape):
-    with open(path, encoding="utf-8-sig") as source:
-        header = source.readline().split()
-        if header and header[0].lstrip("\uFEFF") == "MAPDATA":
-            rows, cols = map(int, source.readline().split()[:2])
-        else:
-            rows, cols = map(int, header)
-        values = np.loadtxt(source, dtype=np.uint8)
-    if (rows, cols) != shape:
-        raise ValueError("分類データと点群データのサイズが一致しません")
-    return values.reshape(shape)
-
-
-def classify_heights(heights):
-    valid = np.isfinite(heights)
-    if not valid.any():
-        return np.zeros(heights.shape, dtype=np.uint8)
-
-    threshold = np.percentile(heights[valid], 5)
-    types = np.zeros(heights.shape, dtype=np.uint8)
-    decided = ~valid
-    ground = valid & (heights <= threshold)
-    types[ground] = 1
-    decided[ground] = True
-    queue = deque(zip(*np.where(ground)))
-
-    while queue:
-        row, col = queue.popleft()
-        for dr, dc in N8:
-            nr, nc = row + dr, col + dc
-            if not (0 <= nr < heights.shape[0] and 0 <= nc < heights.shape[1]):
-                continue
-            if decided[nr, nc] or not valid[nr, nc]:
-                continue
-            neighbor_ground = [
-                heights[rr, cc]
-                for ar, ac in N8
-                for rr, cc in [(nr + ar, nc + ac)]
-                if 0 <= rr < heights.shape[0]
-                and 0 <= cc < heights.shape[1]
-                and types[rr, cc] == 1
-            ]
-            if not neighbor_ground:
-                continue
-            difference = heights[nr, nc] - min(neighbor_ground)
-            types[nr, nc] = 1 if difference <= 1 else 2 if difference >= 4 else 0
-            decided[nr, nc] = True
-            queue.append((nr, nc))
-
-    types[valid & ~decided & (heights >= threshold + 4)] = 2
-    return types
+        if not first_line or first_line[0].lstrip("\uFEFF") != "MAPDATA":
+            raise ValueError(f"{path}: C++ inspectが出力したMAPDATA形式が必要です")
+        rows, cols, origin_x, origin_z = map(int, source.readline().split()[:4])
+        values = np.loadtxt(source, dtype=float)
+        values = np.atleast_2d(values)
+        if values.shape[1] not in (2, 3):
+            raise ValueError(f"{path}: MAPDATAの列数が不正です")
+        values = values.reshape(rows * cols, values.shape[1])
+        heights = values[:, 0].reshape(rows, cols)
+        embedded_types = values[:, 1].astype(np.uint8).reshape(rows, cols)
+        missing = (
+            values[:, 2].astype(bool).reshape(rows, cols)
+            if values.shape[1] == 3
+            else ~np.isfinite(heights)
+        )
+        return heights, origin_x, origin_z, embedded_types, missing
 
 
 def classification_image(types):
@@ -146,7 +73,7 @@ def elevation_image(heights):
 
 
 def main():
-    if len(sys.argv) > 3:
+    if len(sys.argv) > 2:
         raise SystemExit(__doc__)
     pg.setConfigOptions(imageAxisOrder="row-major")
     pg.mkQApp("ABE_Requiem Inspector")
@@ -159,15 +86,8 @@ def main():
     else:
         input_path = sys.argv[1]
 
-    heights, origin_x, origin_z, embedded_types = load_points(input_path)
-    types = embedded_types
-    source_name = "C++ MapData" if types is not None else "標高から自動推定"
-    if len(sys.argv) == 3:
-        types = load_types(Path(sys.argv[2]), heights.shape)
-        source_name = sys.argv[2]
-    if types is None:
-        types = classify_heights(heights)
-
+    heights, origin_x, origin_z, types, missing_mask = load_points(input_path)
+    source_name = "C++ MapData"
 
     window = QMainWindow()
 
@@ -231,7 +151,7 @@ def main():
     missing_view.setAspectLocked(True)
     missing_view.invertY(True)
     missing_image = np.where(
-        (~np.isfinite(heights))[..., None], [255, 0, 0], [245, 245, 245]
+        missing_mask[..., None], [255, 0, 0], [245, 245, 245]
     ).astype(np.uint8)
     missing_image_item = pg.ImageItem(missing_image, axisOrder="row-major")
     missing_view.addItem(missing_image_item)
@@ -248,7 +168,7 @@ def main():
     valid = np.isfinite(heights)
     summary_form.addRow("サイズ", QLabel(f"{heights.shape[0]} x {heights.shape[1]}"))
     summary_form.addRow("有効点", QLabel(f"{int(valid.sum()):,}"))
-    summary_form.addRow("欠損点", QLabel(f"{int((~valid).sum()):,}"))
+    summary_form.addRow("欠損点", QLabel(f"{int(missing_mask.sum()):,}"))
     summary_form.addRow("分類元", QLabel(source_name))
     if values.size:
         summary_form.addRow("標高 最小", QLabel(f"{np.min(values):.2f}"))
@@ -289,7 +209,11 @@ def main():
         col, row = int(np.floor(point.x())), int(np.floor(point.y()))
         if 0 <= row < heights.shape[0] and 0 <= col < heights.shape[1]:
             height = heights[row, col]
-            height_text = "欠損" if np.isnan(height) else f"{height:.2f} m"
+            height_text = (
+                "欠損（補間値）"
+                if missing_mask[row, col]
+                else f"{height:.2f} m"
+            )
             z = origin_z + heights.shape[0] - 1 - row
             window.statusBar().showMessage(
                 f"Row: {row}  Col: {col}  x: {origin_x + col}  z: {z}  "
