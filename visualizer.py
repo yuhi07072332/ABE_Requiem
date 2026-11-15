@@ -23,10 +23,11 @@ def main():
     rows, cols = data.shape
 
     colors = np.array([
-        [255, 255, 255],  # 0: white
-        [0, 0, 255],      # 1: blue
-        [255, 0, 0],      # 2: red
-        [0, 128, 0],      # 3: green
+        [235, 238, 240],  # Unknown(0)         : グレー
+        [100, 149, 190],  # Ground(1)          : 青
+        [210, 115, 110],  # Building(2)        : 赤
+        [110, 175, 135],  # BuildingOutline(3) : 緑
+        [220, 175, 100],  # Other(4)           : オレンジ
     ], dtype=np.uint8)
 
     rgb = colors[data]

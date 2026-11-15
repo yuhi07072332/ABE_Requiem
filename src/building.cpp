@@ -90,6 +90,7 @@ static Building bfs_building(const MapData& data,
 
     Building building;
     std::queue<Coord> queue;
+    visited[start.i, start.j] = true;
     queue.push(start);
 
     while (!queue.empty()) {

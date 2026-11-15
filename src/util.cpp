@@ -17,7 +17,7 @@ std::ostream& operator<<(std::ostream& os, Point p) {
     return os;
 }
 
-/// @brief MapDataのtype行列を図示し保存する(./tools/visualizer.pyを実行する)
+/// @brief MapDataのtype行列を図示し保存する(./visualizer.pyを実行する)
 void show_mapdata(const MapData& data) {
     std::ofstream ofs{"mapdata_temp.dat"};
     std::println(ofs, "{} {}", data.rows, data.cols);

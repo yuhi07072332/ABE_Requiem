@@ -25,12 +25,25 @@ struct Coord {
     Coord operator-(Coord other) const { return {i - other.i, j - other.j}; }
 };
 
-// 点の種類
+struct Building {
+    std::set<Coord> coords;
+    std::vector<std::vector<Coord>> outline_paths;
+    bool has_inner = false;
+
+    Coord top_left = {std::numeric_limits<int>::max(),
+                      std::numeric_limits<int>::max()};
+    Coord bottom_right = {0, 0};
+
+    void append(Coord c);
+};
+
+/// 点の種類
 enum class Type : uint8_t {
     Unknown = 0,                // 未知
-    Ground,                 // 地面
-    Building,               // 建物
-    BuildingOutline,        // 建物(輪郭)
+    Ground,                     // 地面
+    Building,                   // 建物
+    BuildingOutline,            // 建物(輪郭)
+    Other,
 };
 
 /// @brief 地図から読み込んだデータ
@@ -42,6 +55,7 @@ enum class Type : uint8_t {
 struct MapData {
     std::vector<double> grid;
     std::vector<Type> types;
+    std::vector<Building> buildings;
 
     int x, z; // 地図の左下の座標
 
@@ -91,21 +105,9 @@ void show_mapdata(const MapData& data);
 
 /* ----- building ----- */
 
-struct Building {
-    std::set<Coord> coords;
-    std::vector<std::vector<Coord>> outline_paths;
-
-    Coord top_left = {std::numeric_limits<int>::max(),
-                      std::numeric_limits<int>::max()};
-    Coord bottom_right = {0, 0};
-
-    void append(Coord c);
-};
-
 std::vector<Building> process_building(MapData& data);
 
 void test_building_algor();
-
 
 /* ----- algorithm ----- */
 
