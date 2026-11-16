@@ -1,15 +1,11 @@
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
 #include <limits>
 #include <print>
 #include <queue>
 #include <vector>
 
 #include "genk.hpp"
-
-// std::vector<bool> を避けるためのエイリアス
-using Bool = std::int8_t;
 
 // clang-format off
 
@@ -67,20 +63,20 @@ static double calc_initial_ground_threshold(const MapData& data) {
         return std::numeric_limits<double>::quiet_NaN();
     }
 
-    const std::ptrdiff_t ground_idx =
-        valid_heights.size() * INITIAL_GROUND_RATIO;
+    const double ground_idx = valid_heights.size() * INITIAL_GROUND_RATIO;
+    // ground_idx番目にしきい値が来るように処理する
     std::ranges::nth_element(valid_heights, valid_heights.begin() + ground_idx);
     return valid_heights[ground_idx];
 }
 
 /// @brief 地面と接している未確定領域をBFSで探索し、地面・建物・その他に分類する
 static void propagate_from_ground(MapData& data,
-                                  std::vector<std::vector<Bool>>& decided) {
+                                  std::vector<std::vector<bool>>& decided) {
     const int rows = data.rows;
     const int cols = data.cols;
 
     std::queue<Coord> q;
-    std::vector<std::vector<Bool>> in_queue(rows, std::vector<Bool>(cols, false));
+    std::vector<std::vector<bool>> in_queue(rows, std::vector<bool>(cols, false));
 
     bool updated = true;
     while (updated) {
@@ -139,7 +135,7 @@ static void propagate_from_ground(MapData& data,
 
 /// @brief 建物の外周から屋根の内側へBFSで建物判定を広げる（中抜き防止）
 static void fill_building_interiors(MapData& data,
-                                    std::vector<std::vector<Bool>>& decided) {
+                                    std::vector<std::vector<bool>>& decided) {
     const int rows = data.rows;
     const int cols = data.cols;
 
@@ -225,7 +221,7 @@ void classify_map(MapData& data) {
         return;
     }
 
-    std::vector<std::vector<Bool>> decided(rows, std::vector<Bool>(cols, false));
+    std::vector<std::vector<bool>> decided(rows, std::vector<bool>(cols, false));
 
     // 1. 下位5%の点を初期「地面」に設定
     for (int i = 0; i < rows; ++i) {
