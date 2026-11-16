@@ -289,6 +289,7 @@ if __name__ == "__main__":
 自分用
 bash
 
+export PATH="/c/Users/kisou/anaconda3/envs/abe_requiem_env:/c/Users/kisou/anaconda3/envs/abe_requiem_env/Scripts:$PATH"
 export PATH="/c/msys64/ucrt64/bin:/c/msys64/usr/bin:$PATH"
 hash -r
 """
