@@ -105,7 +105,7 @@ void show_mapdata(const MapData& data);
 
 /* ----- building ----- */
 
-std::vector<Building> process_building(MapData& data);
+void process_building(MapData& data);
 
 void test_building_algor();
 

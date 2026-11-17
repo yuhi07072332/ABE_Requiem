@@ -3,7 +3,6 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
-#include <optional>
 #include <print>
 #include <queue>
 #include <vector>
@@ -81,25 +80,18 @@ static double calc_initial_ground_threshold(const MapData& data) {
     return valid_heights[ground_idx];
 }
 
-// NOTE: アルゴリズム修正案
-// * 1段階目では地面、建物輪郭(仮)、その他の分類し、地面のみ拡張
-// * 2段階目ではBuildingOutlineから探索し、建物を拡張
-//      * 輪郭再判定
-//      * 建物内部判定をし、まとまった1つ建物をBuildingに格納
-//      * 建物の幅または横が1しかない場合、すべてOtherに再判定する
-// * 3段階目ではOtherから同様に探索・判定
 
-// NOTE: 
+// TODO: 
+// 1. bfs_building(): 建物へUnknown取り込みに高さ条件を加える
 
-// BFSの状態を表す
 enum State : std::uint8_t{
-    NotVisited = 0,
+    UnVisited = 0,
     Visited = 1,
     Decided = 2,
 };
 
-/// @brief UnknownからBFSで地面・建物輪郭(仮)・その他に分類
-static void bfs_from_unknown(MapData& data,
+/// @brief UnknownからBFSでGroundを拡張し, BuildingOutlineとOtherを仮判定
+static void bfs_ground(MapData& data,
                             std::vector<std::vector<State>>& state) {
     std::queue<Coord> queue;
 
@@ -120,7 +112,7 @@ static void bfs_from_unknown(MapData& data,
 
         const double diff = data.at(c) - min_ground;
 
-        if (diff >= BUILDING_HEIGHT_DIFF_MIN) return Type::BuildingOutline;
+        if (diff >= BUILDING_HEIGHT_DIFF_MIN) return Type::Building;
         if (diff <= GROUND_HEIGHT_DIFF_MAX) return Type::Ground;
         return Type::Other;
     };
@@ -164,30 +156,20 @@ static void bfs_from_unknown(MapData& data,
     }
 }
 
-/// @brief OutlineからBFSで建物を拡張
-static void bfs_from_outline(MapData& data,
-                            std::vector<std::vector<State>>& state) {
-    auto judge_type = [&](Coord c) -> Type {
-        for (Coord dc : n4_dirs) {
-            Coord nc = c + dc;
-            if (!data.contains(nc)) continue;
-            if (data.type_at(nc) == Type::Ground 
-                || data.type_at(nc) == Type::Other) {
-                return Type::BuildingOutline;
-            }
-        }
-        return Type::Building;
-    };
+/// @brief 仮判定されたBuildingからBFSで建物を拡張
+///
+/// @returns buildings
+static std::vector<Building> bfs_building(MapData& data,
+                         std::vector<std::vector<State>>& state) {
+    // BuildingからBFSで穴埋めを行う
+    auto bfs_from = [&](Coord start) -> Building {
+        assert(data.type_at(start) == Type::Building);
 
-    // 輪郭からBFSで穴埋めを行う
-    // 輪郭周辺にvisitしたことない点が存在しないときはnullを返す
-    auto bfs_from = [&](Coord start) -> std::optional<Building> {
-        assert(data.type_at(start) == Type::BuildingOutline);
-
-        std::optional<Building> building = Building{};
+        Building building;
         std::queue<Coord> queue;
         queue.push(start);
-        building->append(start);
+        state[start.i][start.j] = State::Decided;
+        building.append(start);
 
         while (!queue.empty()) {
             Coord c = queue.front();
@@ -197,40 +179,100 @@ static void bfs_from_outline(MapData& data,
                 Coord nc = c + dc;
                 if (!data.contains(nc) 
                     || state[nc.i][nc.j] == State::Decided) continue;
-                if (data.type_at(nc) != Type::Unknown) continue;
+                if (data.type_at(nc) != Type::Building
+                    && data.type_at(nc) != Type::Unknown) continue;
 
-                Type nc_type = judge_type(nc);
-                data.type_at(nc) = nc_type;
-                if (nc_type == Type::Building) building->has_inner = true;
+                data.type_at(nc) = Type::Building;
                 state[nc.i][nc.j] = State::Decided;
-                building->append(c);
+                building.append(nc);
                 queue.push(nc);
             }
         }
 
-        if (building->coords.size() < 2) return std::nullopt;
         return building;
     };
+
+    std::vector<Building> buildings;
 
     for (int i = 0; i < data.rows; ++i) {
         for (int j = 0; j < data.cols; ++j) {
             if (state[i][j] == State::Decided) continue;
-            if (data.type_at(i, j) != Type::BuildingOutline) continue;
+            if (data.type_at(i, j) != Type::Building) continue;
 
-            auto building = bfs_from({i, j});
-            if (!building) continue;
+            Building building = bfs_from(Coord {i, j});
+            if (building.coords.size() > 1) 
+                buildings.push_back(std::move(building));
+            else
+                data.type_at(i, j) = Type::Other;
+        }
+    }
 
-            const int rows = building->bottom_right.i - building->top_left.i + 1;
-            const int cols = building->bottom_right.j - building->top_left.j + 1;
-            const int area = rows * cols;
+    return buildings;
+}
 
-            if (building->has_inner && rows != 1 && cols != 1 && area >= 10) {
-                data.buildings.emplace_back(std::move(*building));
-                continue;
+/// @brief 全てのBuildingに対して輪郭検出を行い、妥当かどうか判定し、MapData::buildingsに格納
+///
+/// @details
+/// * 妥当でなかった場合はdata.buildingsに格納されず、その建物に含まれる
+/// すべての点をOtherに変更する
+static void validate_buildings(std::vector<Building>& buildings, MapData& data) {
+    //Coordが輪郭かを判定する
+    auto is_outline = [&](Coord c) -> bool {
+        for (Coord dc : n4_dirs) {
+            Coord nc = c + dc;
+            if (!data.contains(nc)) continue;
+            if (data.type_at(nc) == Type::Ground
+                || data.type_at(nc) == Type::Other) return true;
+        }
+        return false;
+    };
+
+    auto validate_outline = [&](Building& building) {
+        std::vector<Coord> coords_to_erase;
+        for (Coord c : building.coords) {
+            if (data.type_at(c) != Type::BuildingOutline) continue;
+            bool has_inner_neibor = false;
+
+            for (Coord dc : n8_dirs) {
+                Coord nc = c + dc;
+                if (!data.contains(nc)) continue;
+                if (data.type_at(nc) == Type::Building) {
+                    has_inner_neibor = true;
+                    building.has_inner = true;
+                    break;
+                };
             }
 
-            // 建物がvalidではない
-            for (Coord c : building->coords) {
+            if (!has_inner_neibor) {
+                coords_to_erase.push_back(c);
+                data.type_at(c) = Type::Other;
+            }
+        } 
+
+        for (Coord c : coords_to_erase) {
+            building.coords.erase(c);
+        }
+    };
+
+    // 建物が妥当か否かを判定する
+    auto is_valid = [&](Building& building) -> bool {
+        const int rows = building.bottom_right.i - building.top_left.i + 1;
+        const int cols = building.bottom_right.j - building.top_left.j + 1;
+        const int area = building.coords.size();
+        return building.has_inner && rows > 2 && cols > 2 && area >= 10;
+    };
+
+    for (Building& building : buildings) {
+        for (Coord c : building.coords) {
+            if (is_outline(c)) data.type_at(c) = Type::BuildingOutline;
+        }
+
+        validate_outline(building);
+
+        if (is_valid(building)) {
+            data.buildings.push_back(std::move(building));
+        } else {
+            for (Coord c : building.coords) {
                 data.type_at(c) = Type::Other;
             }
         }
@@ -392,7 +434,7 @@ void classify_map(MapData& data) {
         throw std::runtime_error("classify_map(): 有効な高さデータがありません。");
 
     std::vector<std::vector<State>> state(data.rows,
-                                           std::vector<State>(data.cols, State::NotVisited));
+                                           std::vector<State>(data.cols, State::UnVisited));
 
     // 1. 下位5%の点を初期「地面」に設定
     for (int i = 0; i < data.rows; ++i) {
@@ -406,8 +448,9 @@ void classify_map(MapData& data) {
         }
     }
 
-    bfs_from_unknown(data, state);
-    bfs_from_outline(data, state);
+    bfs_ground(data, state);
+    auto buildings = bfs_building(data, state);
+    validate_buildings(buildings, data);
 
     print_classification_summary(data, threshold);
     /*

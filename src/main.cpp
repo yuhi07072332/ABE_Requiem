@@ -56,7 +56,7 @@ void all(const Option& opt) {
     fill_missing(data);
 
     std::println("{}", "建物処理" | hl);
-    auto buildings = process_building(data);
+    process_building(data);
 
     std::vector<Coord> ground_coords;
 
@@ -74,11 +74,11 @@ void all(const Option& opt) {
     std::println("VRML: 地面");
     
     std::println(ofs, VRML_HEADER);
-    write_delaunay_triangulation(ofs, ground_coords, data, "1 0.5 0.25");
+    write_delaunay_triangulation(ofs, ground_coords, data, "0.25 0.5 1");
 
     std::println("VRML: 建物");
-    for (const auto& building : buildings) {
-        write_building(ofs, data, building, "0.25 0.5 1");
+    for (const auto& building : data.buildings) {
+        write_building(ofs, data, building, "1 0.5 0.25");
     }
 
     std::println("{} に出力しました",
@@ -97,7 +97,7 @@ void all_show(const Option& opt) {
     fill_missing(data);
 
     std::println("{}", "建物処理" | hl);
-    auto buildings = process_building(data);
+    process_building(data);
 
     show_mapdata(data);
 }

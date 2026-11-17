@@ -250,12 +250,9 @@ static void simplify_outline(Building& building, std::vector<Coord>& outline_pat
     }
 }
 
-std::vector<Building> process_building(MapData& data) {
-    find_building_outline(data);
-    auto buildings = ccl_buildings(data);
-    std::println("建物検出: {}個", buildings.size());
+void process_building(MapData& data) {
     std::println("建物削減中...");
-    for (auto [n, building] : buildings | views::enumerate) {
+    for (auto [n, building] : data.buildings | views::enumerate) {
         // std::println("建物{}: {}, {} -> {}, {}", n, building.top_left.i, building.top_left.j, building.bottom_right.i, building.bottom_right.j);
         scan_outlines(data, building);
         // std::println("輪郭数: {}", building.outline_paths.size());
@@ -264,7 +261,6 @@ std::vector<Building> process_building(MapData& data) {
             simplify_outline(building, outline_path);
         }
     }
-    return buildings;
 }
 
 // ──────────────────────────────── test ─────────────────────────────
@@ -391,6 +387,7 @@ void test_building_algor() {
     MapData data = MapData {
         .grid = std::vector<double>(rows * cols, 0),
         .types = std::vector<Type>(type_grid_arr.begin(), type_grid_arr.end()),
+        .buildings = std::vector<Building>{},
         .x = 0,
         .z = 0,
         .rows = rows,
