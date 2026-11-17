@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <string_view>
 #include <variant>
 #include <vector>
@@ -61,6 +62,8 @@ static void print_help() {
                  "-o <ファイル名>" | highlight);
     std::println("{}\t\t出力する際にファイルを上書きするのではなく追加する",
                  "-a, --append" | highlight);
+    std::println("{}\t建物をカラフルにして出力",
+                 "--colorful-buildings" | highlight);
     std::println("{}\t\tヘルプメッセージを出力",
                  "-h, --help" | highlight);
 }
@@ -75,6 +78,7 @@ static void print_error(std::string_view msg) {
 Option parse_args(int argc, const char** argv) {
     Option opt;
     argparse::ArgumentParser parser("genk", "0.1", argparse::default_arguments::none);
+    std::string output_filename;
 
     parser.add_argument("command")
         .store_into(selected_command);
@@ -92,16 +96,20 @@ Option parse_args(int argc, const char** argv) {
 
     parser.add_argument("-o")
         .default_value("out.wrl")
-        .store_into(opt.output_file)
+        .store_into(output_filename)
         .action([&](const std::string& filename){
             if (!filename.ends_with(".wrl")) {
-                opt.output_file = filename + ".wrl";
+                output_filename = filename + ".wrl";
             }
         });
 
     parser.add_argument("-a", "--append")
         .flag()
         .store_into(opt.append);
+
+    parser.add_argument("--colorful-buildings")
+        .flag()
+        .store_into(opt.colorful_buildings);
 
     try {
         parser.parse_args(argc, argv);
@@ -110,6 +118,8 @@ Option parse_args(int argc, const char** argv) {
         print_help();
         throw std::exception();
     }
+
+    opt.output_file = std::move(output_filename);
 
     return opt;
 }
@@ -146,8 +156,28 @@ void run_command(const Option& opt) {
     throw std::exception();
 }
 
-std::ofstream open_output_file(const Option& opt) {
+std::filesystem::path add_prefix(const std::filesystem::path& path,
+                                 std::string_view prefix) {
+    std::filesystem::path new_path = path;
+    new_path.replace_filename(path.filename()
+                                .stem()
+                                .string()
+                                .append(prefix)
+                                .append(path.extension()));
+    return new_path;
+}
+
+std::ofstream open_file(const std::filesystem::path& path, const Option& opt) {
     auto mode = std::ios_base::out;
     if (opt.append) mode |= std::ios_base::app;
-    return std::ofstream(opt.output_file, mode);
+    return std::ofstream(path, mode);
 }
+
+std::ofstream Option::open_output_file() const {
+    return open_file(output_file, *this);
+}
+std::ofstream Option::open_output_file(std::string_view filename) const {
+    std::filesystem::path file = output_file;
+    return open_file(file.replace_filename(filename), *this);
+}
+

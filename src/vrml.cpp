@@ -2,7 +2,6 @@
 #include <ostream>
 #include <string_view>
 #include <print>
-#include <utility>
 #include <vector>
 #include <cstddef>
 #include <ranges>
@@ -12,12 +11,8 @@
 
 #include "genk.hpp"
 
-namespace views = std::views;
-
 /// 点群をElevationGridで出力
 void write_elevation_grid(std::ostream& os, const MapData& data) {
-    std::println(os, VRML_HEADER);
-
     constexpr std::string_view FMT1 = R"(
 Shape {{
    appearance Appearance {{

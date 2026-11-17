@@ -63,5 +63,5 @@ src/  ← ソースコード
 ## Visualizer
 
 ```
-pip install -r visualizer-requirement.txt
+pip install -r visualizer/requirement.txt
 ```

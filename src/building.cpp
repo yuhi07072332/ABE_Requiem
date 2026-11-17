@@ -4,15 +4,15 @@
 #include <mdspan>
 #include <optional>
 #include <print>
-#include <queue>
 #include <ranges>
 #include <set>
 #include <vector>
 #include <format>
 #include <print>
+#include <cassert>
 
 #include "genk.hpp"
-#include "third_party/decoterm.hpp"
+// #include "third_party/decoterm.hpp"
 
 namespace views = std::views;
 
@@ -25,7 +25,7 @@ using Bool = std::int8_t;
 // clang-format off
 
 /// 4近傍
-constexpr std::array<Coord, 4> n4_dirs = {{
+[[maybe_unused]] constexpr std::array<Coord, 4> n4_dirs = {{
     {0, -1},
     {-1, 0},
     {0, 1},
@@ -57,83 +57,6 @@ void Building::append(Coord c) {
 bool is_n4(Coord dir) { return dir.i == 0 || dir.j == 0; }
 
 auto indices(auto a, auto b) { return views::iota(decltype(b)(a), b); }
-
-/// @brief 建物の輪郭検出を行う
-static void find_building_outline(MapData& data) {
-    for (int i = 0; i < data.rows; ++i) {
-        for (int j = 0; j < data.cols; ++j) {
-            Coord c = {i, j};
-            if (data.type_at(i, j) != Type::Building) continue;
-            for (Coord dc : n4_dirs) {
-                Coord nc = c + dc;
-
-                if (!data.contains(nc)) {
-                    data.type_at(c) = Type::BuildingOutline;
-                    break;
-                }
-
-                if (data.type_at(nc) != Type::Building
-                    && data.type_at(nc) != Type::BuildingOutline) {
-                    data.type_at(c) = Type::BuildingOutline;
-                    break;
-                }
-            }
-        }
-    }
-}
-
-/// @brief startから建物をBFS探索していく
-static Building bfs_building(const MapData& data,
-                             Matrix<Bool> visited,
-                             Coord start) {
-    assert(data.type_at(start) == Type::BuildingOutline);
-
-    Building building;
-    std::queue<Coord> queue;
-    queue.push(start);
-
-    while (!queue.empty()) {
-        Coord c = queue.front();
-        queue.pop();
-
-        building.append(c);
-
-        for (Coord dc : n4_dirs) {
-            Coord nc = c + dc;
-            if (!data.contains(nc)) continue;
-
-            if (visited[nc.i, nc.j]) continue;
-
-            if (data.type_at(nc) == Type::Building
-                || data.type_at(nc) == Type::BuildingOutline) {
-                visited[nc.i, nc.j] = true;
-                queue.push(nc);
-            }
-        }
-    }
-
-    return building;
-}
-
-/// @brief 建物(輪郭と内部)と判定された点群の領域を建物ごとに分別する
-///
-/// @details 建物の輪郭からBFSで探索を行う
-static std::vector<Building> ccl_buildings(const MapData& data) {
-    std::vector<Building> buildings;
-    std::vector<Bool> visited_arr =
-        std::vector<Bool>(data.rows * data.cols, false);
-    Matrix<Bool> visited {visited_arr.data(), data.rows, data.cols};
-
-    for (int i = 0; i < data.rows; ++i) {
-        for (int j = 0; j < data.cols; ++j) {
-            if (visited[i, j] || data.type_at(i, j) != Type::BuildingOutline)
-                continue;
-            buildings.emplace_back(bfs_building(data, visited, {i, j}));
-        }
-    }
-
-    return buildings;
-}
 
 struct TraceState {
     Coord current;
@@ -249,24 +172,19 @@ static void simplify_outline(Building& building, std::vector<Coord>& outline_pat
     }
 }
 
-std::vector<Building> process_building(MapData& data) {
-    find_building_outline(data);
-    auto buildings = ccl_buildings(data);
-    std::println("建物検出: {}個", buildings.size());
+void process_building(MapData& data) {
     std::println("建物削減中...");
-    for (auto [n, building] : buildings | views::enumerate) {
+    for (auto [n, building] : data.buildings | views::enumerate) {
         // std::println("建物{}: {}, {} -> {}, {}", n, building.top_left.i, building.top_left.j, building.bottom_right.i, building.bottom_right.j);
         scan_outlines(data, building);
-        // std::println("輪郭数: {}", building.outline_paths.size());
-        for (const auto [i, outline_path] :
-             building.outline_paths | views::enumerate) {
+        for (auto& outline_path : building.outline_paths) {
             simplify_outline(building, outline_path);
         }
     }
-    return buildings;
 }
 
 // ──────────────────────────────── test ─────────────────────────────
+# if 0
 
 static constexpr int TEST_DATA_SIZE = 32;
 
@@ -323,6 +241,7 @@ static consteval auto test_type_grid() {
 
     return converted_arr;
 }
+
 
 template <typename F>
 static void print_type_grid(Matrix<const Type> type_grid,
@@ -390,6 +309,7 @@ void test_building_algor() {
     MapData data = MapData {
         .grid = std::vector<double>(rows * cols, 0),
         .types = std::vector<Type>(type_grid_arr.begin(), type_grid_arr.end()),
+        .buildings = std::vector<Building>{},
         .x = 0,
         .z = 0,
         .rows = rows,
@@ -435,3 +355,4 @@ void test_building_algor() {
         }
     }
 }
+#endif 
