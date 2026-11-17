@@ -75,23 +75,6 @@ void all(const Option& opt) {
                  out_building_path.string());
 }
 
-void all_show(const Option& opt) {
-    const deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
-
-    MapData data = read_map(opt.input_file);
-
-    std::println("{}", "分類" | hl);
-    classify_map(data);
-
-    std::println("{}", "欠損点補間" | hl);
-    fill_missing(data);
-
-    std::println("{}", "建物処理" | hl);
-    process_building(data);
-
-    show_mapdata_types(data);
-}
-
 void show_classify(const Option& opt) {
     MapData data = read_map(opt.input_file);
     classify_map(data);
@@ -133,7 +116,7 @@ void inspect(const Option& opt) {
     fill_missing(data);
 
     std::println("{}", "建物処理" | hl);
-    auto buildings = process_building(data);
+    process_building(data);
 
     // 一時ファイルにデータを保存
     constexpr const char* temp_file = "inspector_temp.dat";
@@ -152,7 +135,7 @@ void inspect(const Option& opt) {
     }
 
     // Pythonのビューアを起動
-    const int result = std::system("python inspector.py inspector_temp.dat");
+    const int result = std::system("python ./tools/inspector.py inspector_temp.dat");
     std::filesystem::remove(temp_file);
     if (result != 0)
         throw std::runtime_error("inspect: integrated viewer failed to start");
@@ -169,7 +152,6 @@ int main(int argc, const char** argv) {
     try {
         // コマンドを登録
         add_command("all", "すべてのアルゴリズムとVRML化を実行", all);
-        add_command("all-show", "すべてのアルゴリズム実行し、VRML化をせずvisualizerを起動", all_show);
 
         add_command("show-heights", "点群の高さを図示", show_heights);
         add_command("show-classify", "classifyの結果を図示", show_classify);

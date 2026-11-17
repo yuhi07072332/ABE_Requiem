@@ -202,6 +202,31 @@ static int write_building(std::ostream& os,
     return faces.size();
 }
 
+struct RGB {
+    double r, g, b;
+};
+
+RGB hsv_to_rgb(double h, double s, double v) {
+    h = std::fmod(h, 360.0);
+    if (h < 0.0) h += 360.0;
+
+    const double c = v * s;
+    const double x = c * (1.0 - std::abs(std::fmod(h / 60.0, 2.0) - 1.0));
+    const double m = v - c;
+
+    RGB rgb;
+
+    if      (h < 60)  rgb = {c, x, 0};
+    else if (h < 120) rgb = {x, c, 0};
+    else if (h < 180) rgb = {0, c, x};
+    else if (h < 240) rgb = {0, x, c};
+    else if (h < 300) rgb = {x, 0, c};
+    else              rgb = {c, 0, x};
+
+    return {rgb.r + m, rgb.g + m, rgb.b + m};
+}
+
+
 /// @brief 全てのVRML化を行う
 ///
 /// @param out メインとなるwrlを出力するためのostream

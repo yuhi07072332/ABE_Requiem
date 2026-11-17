@@ -105,12 +105,6 @@ void show_mapdata_types(const MapData& data);
 void show_mapdata_heights(const MapData& data);
 void show_mapdata_buildings(const MapData& data);
 
-struct RGB {
-    double r, g, b;
-};
-
-RGB hsv_to_rgb(double h, double s, double v);
-
 /* ----- building ----- */
 
 void process_building(MapData& data);

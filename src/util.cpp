@@ -30,7 +30,7 @@ void show_mapdata_types(const MapData& data) {
     }
     ofs.close();
 
-    std::system("python ./visualizer/visualizer.py types ./mapdata_temp.dat");
+    std::system("python ./tools/visualizer.py types ./mapdata_temp.dat");
     std::filesystem::remove("./mapdata_temp.dat");
 }
 
@@ -47,7 +47,7 @@ void show_mapdata_heights(const MapData& data) {
     }
     ofs.close();
 
-    std::system("python ./visualizer/visualizer.py heights ./mapdata_temp.dat");
+    std::system("python ./tools/visualizer.py heights ./mapdata_temp.dat");
     std::filesystem::remove("./mapdata_temp.dat");
 }
 
@@ -72,26 +72,7 @@ void show_mapdata_buildings(const MapData& data) {
     }
     ofs.close();
 
-    std::system("python ./visualizer/visualizer.py buildings ./mapdata_temp.dat");
+    std::system("python ./tools/visualizer.py buildings ./mapdata_temp.dat");
     std::filesystem::remove("./mapdata_temp.dat");
 }
 
-RGB hsv_to_rgb(double h, double s, double v) {
-    h = std::fmod(h, 360.0);
-    if (h < 0.0) h += 360.0;
-
-    const double c = v * s;
-    const double x = c * (1.0 - std::abs(std::fmod(h / 60.0, 2.0) - 1.0));
-    const double m = v - c;
-
-    RGB rgb;
-
-    if      (h < 60)  rgb = {c, x, 0};
-    else if (h < 120) rgb = {x, c, 0};
-    else if (h < 180) rgb = {0, c, x};
-    else if (h < 240) rgb = {0, x, c};
-    else if (h < 300) rgb = {x, 0, c};
-    else              rgb = {c, 0, x};
-
-    return {rgb.r + m, rgb.g + m, rgb.b + m};
-}
