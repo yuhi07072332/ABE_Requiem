@@ -56,6 +56,7 @@ def colorize_heights(data):
 
     # Normalize to [0, 1].
     t = np.clip(bins / num_bins, 0.0, 1.0)
+    t = np.power(t, 0.45)
 
     # Low: light blue, High: dark blue.
     low_color = np.array([220, 235, 250])

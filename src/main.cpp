@@ -109,7 +109,11 @@ Inline {{
     std::println("地面");
     
     std::print(out_ground, VRML_HEADER);
-    write_delaunay_triangulation(out_ground, ground_coords, data, "0.25 0.5 1");
+    if (opt.colorful_buildings) {
+        write_delaunay_triangulation(out_ground, ground_coords, data, "0.3 0.3 0.3");
+    } else {
+        write_delaunay_triangulation(out_ground, ground_coords, data, "0.25 0.5 1");
+    }
 
     std::println("建物");
 
