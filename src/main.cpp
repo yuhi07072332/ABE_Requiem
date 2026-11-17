@@ -15,7 +15,7 @@
 // NOTE: 
 // * コマンド関数は`void()`または`void(const Option& opt)`の形であること
 // * 基本的な流れとして、`read_map(opt.input_file)`でMapDataを読み込み、
-//   `open_output_file(opt)`で出力ファイルへの`std::ofstream`を受け取る
+//   `opt.open_output_file()`で出力ファイルへの`std::ofstream`を受け取る
 
 void report_heights(const Option& opt) {
     MapData data = read_map(opt.input_file);
@@ -27,10 +27,10 @@ void report_heights(const Option& opt) {
 
 void gen_points(const Option& opt) {
     MapData data = read_map(opt.input_file);
-    std::ofstream ofs = open_output_file(opt);
+    std::ofstream ofs = opt.open_output_file();
     write_elevation_grid(ofs, data);
     std::println("{} に出力しました",
-                 opt.output_file | deco::fg(deco::bright_yellow));
+                 opt.output_file.filename().string() | deco::fg(deco::bright_yellow));
 }
 
 void test_building() {
@@ -47,7 +47,6 @@ void all(const Option& opt) {
     const deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
 
     MapData data = read_map(opt.input_file);
-    auto ofs = open_output_file(opt);
 
     std::println("{}", "分類" | hl);
     classify_map(data);
@@ -71,18 +70,45 @@ void all(const Option& opt) {
         }
     }
 
+    std::ofstream out = opt.open_output_file();
+
+    std::filesystem::path out_ground_path = add_prefix(opt.output_file, "_ground");
+    std::ofstream out_ground = 
+        opt.open_output_file(out_ground_path.string());
+
+    std::filesystem::path out_building_path = add_prefix(opt.output_file, "_building");
+    std::ofstream out_building = 
+        opt.open_output_file(out_building_path.string());
+
+    constexpr std::string_view MAIN_VRML = R"({}
+Inline {{
+    url "{}"
+}}
+
+Inline {{
+    url "{}"
+}}
+)";
+
+    std::print(out, MAIN_VRML, VRML_HEADER, out_ground_path.string(), out_building_path.string());
+
     std::println("VRML: 地面");
     
-    std::println(ofs, VRML_HEADER);
-    write_delaunay_triangulation(ofs, ground_coords, data, "0.25 0.5 1");
+    std::print(out_ground, VRML_HEADER);
+    write_delaunay_triangulation(out_ground, ground_coords, data, "0.25 0.5 1");
 
     std::println("VRML: 建物");
+
+    std::print(out_building, VRML_HEADER);
+
     for (const auto& building : data.buildings) {
-        write_building(ofs, data, building, "1 0.5 0.25");
+        write_building(out_building, data, building, "1 0.5 0.25");
     }
 
-    std::println("{} に出力しました",
-                 opt.output_file | deco::fg(deco::bright_yellow));
+    std::println("{}, {}, {}に出力しました",
+                 opt.output_file.filename().string(),
+                 out_ground_path.filename().string(),
+                 out_building_path.filename().string());
 }
 
 void all_show(const Option& opt) {

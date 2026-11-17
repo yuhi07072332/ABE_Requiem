@@ -258,7 +258,7 @@ void process_building(MapData& data) {
         // std::println("輪郭数: {}", building.outline_paths.size());
         for (const auto [i, outline_path] :
              building.outline_paths | views::enumerate) {
-            simplify_outline(building, outline_path);
+            // simplify_outline(building, outline_path);
         }
     }
 }
