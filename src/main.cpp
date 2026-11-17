@@ -3,7 +3,6 @@
 #include <fstream>
 #include <print>
 #include <string>
-#include <ranges>
 
 #include "third_party/decoterm.hpp"
 
@@ -35,20 +34,6 @@ void gen_points(const Option& opt) {
 }
 
 void all(const Option& opt) {
-    auto building_color = [&](std::size_t index) -> std::string {
-        constexpr double GOLDEN_ANGLE = 137.50776405003785;
-
-        const double hue = std::fmod(index * GOLDEN_ANGLE, 360.0);
-
-        constexpr double saturation = 0.65;
-        constexpr double value = 0.90;
-
-        const RGB rgb = hsv_to_rgb(hue, saturation, value);
-
-        return std::format("{:.4f} {:.4f} {:.4f}",
-                           rgb.r, rgb.g, rgb.b);
-    };
-
     const deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
 
     MapData data = read_map(opt.input_file);
@@ -62,18 +47,7 @@ void all(const Option& opt) {
     std::println("{}", "建物処理" | hl);
     process_building(data);
 
-    std::vector<Coord> ground_coords;
-
-    for (int i = 0; i < data.rows; ++i) { 
-        for (int j = 0; j < data.cols; ++j) {
-            switch (data.type_at(i, j)) {
-                case Type::Ground: 
-                case Type::Unknown: ground_coords.emplace_back(i, j);
-                    break;
-                default: break;
-            }
-        }
-    }
+    std::println("{}", "VRML化" | hl);
 
     std::ofstream out = opt.open_output_file();
 
@@ -85,46 +59,13 @@ void all(const Option& opt) {
     std::ofstream out_building = 
         opt.open_output_file(out_building_path.string());
 
-    constexpr std::string_view MAIN_VRML = R"({}
-Inline {{
-    url "{}"
-}}
-
-Inline {{
-    url "{}"
-}}
-)";
-
-    std::println("{}", "VRML化" | hl);
-
-    std::print(out, 
-               MAIN_VRML, VRML_HEADER, 
-               out_ground_path.filename().string(),
-               out_building_path.filename().string());
-
-    std::println("地面");
-    
-    std::print(out_ground, VRML_HEADER);
-    if (opt.colorful_buildings) {
-        write_delaunay_triangulation(out_ground, ground_coords, data, "0.3 0.3 0.3");
-    } else {
-        write_delaunay_triangulation(out_ground, ground_coords, data, "0.25 0.5 1");
-    }
-
-    std::println("建物");
-
-    std::print(out_building, VRML_HEADER);
-
-    if (opt.colorful_buildings) {
-        for (const auto& [i, building] 
-            : data.buildings | std::views::enumerate) {
-            write_building(out_building, data, building, building_color(i));
-        }
-    } else {
-        for (const auto& building : data.buildings) {
-            write_building(out_building, data, building, "1 0.5 0.25");
-        }
-    }
+    export_vrml(data,
+                out,
+                out_ground,
+                out_ground_path.string(),
+                out_building,
+                out_building_path.string(),
+                opt.colorful_buildings);
 
     std::println("{}, {}, {}に出力しました",
                  opt.output_file.string(),

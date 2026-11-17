@@ -133,15 +133,14 @@ void fill_missing(MapData& data);
 inline constexpr std::string_view VRML_HEADER = "#VRML V2.0 utf8";
 
 void write_elevation_grid(std::ostream& os, const MapData& data);
-int write_delaunay_triangulation(std::ostream& os,
-                                 const std::vector<Coord>& coords,
-                                 const MapData& data,
-                                 std::string_view diffuse_color = "0.3 0.5 0.7");
 
-int write_building(std::ostream& os,
-                    const MapData& data,
-                    const Building& building,
-                    std::string_view diffuse_color = "0.3 0.5 0.7");
+void export_vrml(const MapData& data,
+                std::ostream& out,
+                std::ostream& out_ground,
+                std::string_view out_ground_filename,
+                std::ostream& out_building,
+                std::string_view out_building_filename,
+                bool colorful_buildings);
 
 /* ----- input ----- */
 

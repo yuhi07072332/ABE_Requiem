@@ -80,7 +80,7 @@ constexpr std::string_view INDEXEDFACESET_FMT3 = R"(
 
 /// @brief 点群に対しドロネーの三角形分割を実行し、IndexFacedSetとして出力
 /// @returns 三角形の面数
-int write_delaunay_triangulation(std::ostream& os,
+static int write_delaunay_triangulation(std::ostream& os,
                                  const std::vector<Coord>& coords,
                                  const MapData& data,
                                  std::string_view diffuse_color) {
@@ -120,11 +120,10 @@ int write_delaunay_triangulation(std::ostream& os,
 
 }
 
-
 /// @brief 建物をIndexFacedSetとして出力
 ///
 /// @returns 面数
-int write_building(std::ostream& os,
+static int write_building(std::ostream& os,
                     const MapData& data,
                     const Building& building,
                     std::string_view diffuse_color) {
@@ -201,4 +200,85 @@ int write_building(std::ostream& os,
     }
 
     return faces.size();
+}
+
+/// @brief 全てのVRML化を行う
+///
+/// @param out メインとなるwrlを出力するためのostream
+/// @param out_ground 地面部分を出力するためのostream
+/// @param out_building 建物部分を出力するためのostream
+/// @param out_ground_filename out_groundに対応ファイル名
+/// @param out_building_filename out_buildingに対応ファイル名
+/// @param colorful_buildings 建物それぞれについて色分けするか
+void export_vrml(const MapData& data,
+                std::ostream& out,
+                std::ostream& out_ground,
+                std::string_view out_ground_filename,
+                std::ostream& out_building,
+                std::string_view out_building_filename,
+                bool colorful_buildings) {
+    auto building_color = [&](std::size_t index) -> std::string {
+        constexpr double GOLDEN_ANGLE = 137.50776405003785;
+
+        const double hue = std::fmod(index * GOLDEN_ANGLE, 360.0);
+
+        constexpr double saturation = 0.65;
+        constexpr double value = 0.90;
+
+        const RGB rgb = hsv_to_rgb(hue, saturation, value);
+
+        return std::format("{:.4f} {:.4f} {:.4f}",
+                           rgb.r, rgb.g, rgb.b);
+    };
+
+
+    constexpr std::string_view MAIN_VRML = R"({}
+Inline {{
+    url "{}"
+}}
+
+Inline {{
+    url "{}"
+}}
+)";
+
+    std::vector<Coord> ground_coords;
+
+    for (int i = 0; i < data.rows; ++i) { 
+        for (int j = 0; j < data.cols; ++j) {
+            switch (data.type_at(i, j)) {
+                case Type::Ground: 
+                case Type::Unknown: ground_coords.emplace_back(i, j);
+                    break;
+                default: break;
+            }
+        }
+    }
+
+    std::print(out, 
+               MAIN_VRML,
+               VRML_HEADER, 
+               out_ground_filename,
+               out_building_filename);
+    
+    std::print(out_ground, VRML_HEADER);
+    if (colorful_buildings) {
+        write_delaunay_triangulation(out_ground, ground_coords, data, "0.3 0.3 0.3");
+    } else {
+        write_delaunay_triangulation(out_ground, ground_coords, data, "0.25 0.5 1");
+    }
+
+    std::print(out_building, VRML_HEADER);
+
+    if (colorful_buildings) {
+        for (const auto& [i, building] 
+            : data.buildings | std::views::enumerate) {
+            write_building(out_building, data, building, building_color(i));
+        }
+    } else {
+        for (const auto& building : data.buildings) {
+            write_building(out_building, data, building, "1 0.5 0.25");
+        }
+    }
+
 }
