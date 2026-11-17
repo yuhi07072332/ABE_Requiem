@@ -20,9 +20,9 @@ from PySide6.QtWidgets import (
 )
 
 
-TYPE_NAMES = {0: "Unknown", 1: "Ground", 2: "Building", 3: "BuildingOutline"}
+TYPE_NAMES = {0: "Unknown", 1: "Ground", 2: "Building", 3: "BuildingOutline", 4: "Other"}
 TYPE_COLORS = np.array(
-    [[255, 255, 255], [0, 0, 255], [255, 0, 0], [0, 180, 0]], dtype=np.uint8
+    [[255, 255, 0], [0, 0, 255], [255, 0, 0], [0, 180, 0], [255, 255, 255]], dtype=np.uint8
 )
 
 
