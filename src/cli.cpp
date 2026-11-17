@@ -163,7 +163,7 @@ std::filesystem::path add_prefix(const std::filesystem::path& path,
                                 .stem()
                                 .string()
                                 .append(prefix)
-                                .append(path.extension()));
+                                .append(path.extension().string()));
     return new_path;
 }
 
