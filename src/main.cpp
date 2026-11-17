@@ -3,6 +3,7 @@
 #include <fstream>
 #include <print>
 #include <string>
+#include <ranges>
 
 #include "third_party/decoterm.hpp"
 
@@ -37,13 +38,21 @@ void test_building() {
     test_building_algor();
 }
 
-void show_classify(const Option& opt) {
-    MapData data = read_map(opt.input_file);
-    classify_map(data);
-    show_mapdata(data);
-}
-
 void all(const Option& opt) {
+    auto building_color = [&](std::size_t index) -> std::string {
+        constexpr double GOLDEN_ANGLE = 137.50776405003785;
+
+        const double hue = std::fmod(index * GOLDEN_ANGLE, 360.0);
+
+        constexpr double saturation = 0.65;
+        constexpr double value = 0.90;
+
+        const RGB rgb = hsv_to_rgb(hue, saturation, value);
+
+        return std::format("{:.4f} {:.4f} {:.4f}",
+                           rgb.r, rgb.g, rgb.b);
+    };
+
     const deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
 
     MapData data = read_map(opt.input_file);
@@ -90,25 +99,37 @@ Inline {{
 }}
 )";
 
-    std::print(out, MAIN_VRML, VRML_HEADER, out_ground_path.string(), out_building_path.string());
+    std::println("{}", "VRML化" | hl);
 
-    std::println("VRML: 地面");
+    std::print(out, 
+               MAIN_VRML, VRML_HEADER, 
+               out_ground_path.filename().string(),
+               out_building_path.filename().string());
+
+    std::println("地面");
     
     std::print(out_ground, VRML_HEADER);
     write_delaunay_triangulation(out_ground, ground_coords, data, "0.25 0.5 1");
 
-    std::println("VRML: 建物");
+    std::println("建物");
 
     std::print(out_building, VRML_HEADER);
 
-    for (const auto& building : data.buildings) {
-        write_building(out_building, data, building, "1 0.5 0.25");
+    if (opt.colorful_buildings) {
+        for (const auto& [i, building] 
+            : data.buildings | std::views::enumerate) {
+            write_building(out_building, data, building, building_color(i));
+        }
+    } else {
+        for (const auto& building : data.buildings) {
+            write_building(out_building, data, building, "1 0.5 0.25");
+        }
     }
 
     std::println("{}, {}, {}に出力しました",
-                 opt.output_file.filename().string(),
-                 out_ground_path.filename().string(),
-                 out_building_path.filename().string());
+                 opt.output_file.string(),
+                 out_ground_path.string(),
+                 out_building_path.string());
 }
 
 void all_show(const Option& opt) {
@@ -125,7 +146,24 @@ void all_show(const Option& opt) {
     std::println("{}", "建物処理" | hl);
     process_building(data);
 
-    show_mapdata(data);
+    show_mapdata_types(data);
+}
+
+void show_classify(const Option& opt) {
+    MapData data = read_map(opt.input_file);
+    classify_map(data);
+    show_mapdata_types(data);
+}
+
+void show_buildings(const Option& opt) {
+    MapData data = read_map(opt.input_file);
+    classify_map(data);
+    show_mapdata_buildings(data);
+}
+
+void show_heights(const Option& opt) {
+    MapData data = read_map(opt.input_file);
+    show_mapdata_heights(data);
 }
 
 void test() {
@@ -140,12 +178,14 @@ int main(int argc, const char** argv) {
         // コマンドを登録
         add_command("all", "すべてのアルゴリズムとVRML化を実行", all);
         add_command("all-show", "すべてのアルゴリズム実行し、VRML化をせずvisualizerを起動", all_show);
+        add_command("show-heights", "点群の高さを図示", show_heights);
+        add_command("show-classify", "classifyの結果を図示", show_classify);
+        add_command("show-buildings", "建物を色分けで図示", show_buildings);
 
         add_command(
             "report-heights", "点群の高さの度数分布表を表示", report_heights);
         add_command("gen-points", "地図データから点群を直接出力", gen_points);
         add_command("test-building", "建物に関する処理を仮想データでテスト", test_building);
-        add_command("show-classify", "classifyの結果を図示", show_classify);
 
 
         add_command("test", "テスト用コマンド", test);

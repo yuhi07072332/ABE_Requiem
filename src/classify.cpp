@@ -450,6 +450,7 @@ void classify_map(MapData& data) {
 
     bfs_ground(data, state);
     auto buildings = bfs_building(data, state);
+
     validate_buildings(buildings, data);
 
     print_classification_summary(data, threshold);

@@ -2,7 +2,6 @@
 #include <ostream>
 #include <string_view>
 #include <print>
-#include <utility>
 #include <vector>
 #include <cstddef>
 #include <ranges>

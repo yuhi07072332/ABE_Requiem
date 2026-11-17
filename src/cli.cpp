@@ -62,6 +62,8 @@ static void print_help() {
                  "-o <ファイル名>" | highlight);
     std::println("{}\t\t出力する際にファイルを上書きするのではなく追加する",
                  "-a, --append" | highlight);
+    std::println("{}\t建物をカラフルにして出力",
+                 "--colorful-buildings" | highlight);
     std::println("{}\t\tヘルプメッセージを出力",
                  "-h, --help" | highlight);
 }
@@ -97,13 +99,17 @@ Option parse_args(int argc, const char** argv) {
         .store_into(output_filename)
         .action([&](const std::string& filename){
             if (!filename.ends_with(".wrl")) {
-                opt.output_file = filename + ".wrl";
+                output_filename = filename + ".wrl";
             }
         });
 
     parser.add_argument("-a", "--append")
         .flag()
         .store_into(opt.append);
+
+    parser.add_argument("--colorful-buildings")
+        .flag()
+        .store_into(opt.colorful_buildings);
 
     try {
         parser.parse_args(argc, argv);

@@ -9,7 +9,9 @@
 struct Option {
     std::string input_file;                         // 入力ファイル
     std::filesystem::path output_file;              // 出力ファイル
-    bool append;                                    // 出力する際にファイルを上書きするのではなく追加する
+    bool append = false;                            // 出力する際にファイルを上書きするのではなく追加する
+    
+    bool colorful_buildings = false;
 
     /// `output_file`をオープンし、`ofstream`を返す
     std::ofstream open_output_file() const;
