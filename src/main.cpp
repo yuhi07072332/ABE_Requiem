@@ -34,10 +34,6 @@ void gen_points(const Option& opt) {
                  opt.output_file.filename().string() | deco::fg(deco::bright_yellow));
 }
 
-void test_building() {
-    test_building_algor();
-}
-
 void all(const Option& opt) {
     auto building_color = [&](std::size_t index) -> std::string {
         constexpr double GOLDEN_ANGLE = 137.50776405003785;
@@ -189,7 +185,6 @@ int main(int argc, const char** argv) {
         add_command(
             "report-heights", "点群の高さの度数分布表を表示", report_heights);
         add_command("gen-points", "地図データから点群を直接出力", gen_points);
-        add_command("test-building", "建物に関する処理を仮想データでテスト", test_building);
 
 
         add_command("test", "テスト用コマンド", test);
