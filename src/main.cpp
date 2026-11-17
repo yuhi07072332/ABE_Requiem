@@ -1,6 +1,8 @@
-#include <exception>
+﻿#include <exception>
 #include <format>
 #include <fstream>
+#include <cstdlib>
+#include <filesystem>
 #include <print>
 #include <string>
 
@@ -107,6 +109,55 @@ void show_heights(const Option& opt) {
     show_mapdata_heights(data);
 }
 
+void inspect(const Option& opt) {
+    const deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
+
+    // 入力ファイルが指定されていない場合はエラー
+    if (opt.input_file.empty())
+        throw std::runtime_error("inspect: input file is required");
+
+    MapData data = read_map(opt.input_file);
+
+    std::println("{}", "分類" | hl);
+    classify_map(data);
+
+    // 元々欠損点だったかどうかを記録する配列
+    std::vector<bool> originally_missing(data.rows * data.cols);
+    for (int i = 0; i < data.rows; ++i) {
+        for (int j = 0; j < data.cols; ++j) {
+            originally_missing[i * data.cols + j] = data.is_missing(i, j);
+        }
+    }
+
+    std::println("{}", "欠損点補間" | hl);
+    fill_missing(data);
+
+    std::println("{}", "建物処理" | hl);
+    auto buildings = process_building(data);
+
+    // 一時ファイルにデータを保存
+    constexpr const char* temp_file = "inspector_temp.dat";
+    {
+        std::ofstream ofs{temp_file};
+        std::println(ofs, "MAPDATA 1");
+        std::println(ofs, "{} {} {} {}", data.rows, data.cols, data.x, data.z);
+        for (int i = 0; i < data.rows; ++i) {
+            for (int j = 0; j < data.cols; ++j) {
+                std::println(ofs, "{} {} {}",
+                             data.at(i, j),
+                             static_cast<int>(data.type_at(i, j)),
+                             originally_missing[i * data.cols + j] ? 1 : 0);
+            }
+        }
+    }
+
+    // Pythonのビューアを起動
+    const int result = std::system("python inspector.py inspector_temp.dat");
+    std::filesystem::remove(temp_file);
+    if (result != 0)
+        throw std::runtime_error("inspect: integrated viewer failed to start");
+}
+
 void test() {
 }
 
@@ -128,6 +179,8 @@ int main(int argc, const char** argv) {
             "report-heights", "点群の高さの度数分布表を表示", report_heights);
         add_command("gen-points", "地図データから点群を直接出力", gen_points);
 
+
+        add_command("inspect", "すべてのアルゴリズムを実行し、総合ビューアを起動", inspect);
 
         add_command("test", "テスト用コマンド", test);
 
