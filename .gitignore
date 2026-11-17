@@ -3,6 +3,7 @@ map_data
 *.exe
 *.wrl
 *.dat
+*.png
 genk
 build/
 .vscode/
