@@ -115,6 +115,9 @@ void test_building_algor();
 
 std::map<int, int> calc_frequency(const std::vector<double>& heights,
                                   int width = 5);
+
+/* ----- smooth ------ */
+
 // 近い数値（高さ）の点を間引いてNaNにする
 void downsample_flat_points(MapData& data, int block_size, double height_threshold);
 
@@ -122,7 +125,6 @@ void downsample_flat_points(MapData& data, int block_size, double height_thresho
 
 /// 欠損点補完
 void fill_missing(MapData& data);
-
 
 /* ----- vrml ----- */
 

@@ -156,7 +156,7 @@ void run_command(const Option& opt) {
     throw std::exception();
 }
 
-std::filesystem::path add_prefix(const std::filesystem::path& path,
+static std::filesystem::path add_suffix(const std::filesystem::path& path,
                                  std::string_view prefix) {
     std::filesystem::path new_path = path;
     new_path.replace_filename(path.filename()
@@ -176,8 +176,8 @@ std::ofstream open_file(const std::filesystem::path& path, const Option& opt) {
 std::ofstream Option::open_output_file() const {
     return open_file(output_file, *this);
 }
-std::ofstream Option::open_output_file(std::string_view filename) const {
-    std::filesystem::path file = output_file;
-    return open_file(file.replace_filename(filename), *this);
-}
 
+std::pair<std::ofstream, std::string> Option::open_output_file_suffix(std::string_view suffix) const {
+    std::filesystem::path out_path = add_suffix(output_file, suffix);
+    return std::make_pair(open_file(out_path, *this), out_path.string());
+}

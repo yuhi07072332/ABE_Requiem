@@ -1,4 +1,5 @@
-﻿#include <exception>
+﻿#include <algorithm>
+#include <exception>
 #include <format>
 #include <fstream>
 #include <cstdlib>
@@ -10,6 +11,23 @@
 
 #include "cli.hpp"
 #include "genk.hpp"
+
+constexpr deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
+
+/// 全てのアルゴリズムを実行
+void exec_all(MapData& data) {
+    std::println("{}", "分類" | hl);
+    classify_map(data);
+
+    std::println("{}", "欠損点補間" | hl);
+    fill_missing(data);
+
+    std::println("{}", "平滑化" | hl);
+    downsample_flat_points(data, 2, 0.1);
+
+    std::println("{}", "建物処理" | hl);
+    process_building(data);
+}
 
 // ┌                                                         ┐
 // │                        コマンド                         │
@@ -36,43 +54,29 @@ void gen_points(const Option& opt) {
 }
 
 void all(const Option& opt) {
-    const deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
-
     MapData data = read_map(opt.input_file);
-
-    std::println("{}", "分類" | hl);
-    classify_map(data);
-
-    std::println("{}", "欠損点補間" | hl);
-    fill_missing(data);
-
-    std::println("{}", "建物処理" | hl);
-    process_building(data);
+    exec_all(data);
 
     std::println("{}", "VRML化" | hl);
+    auto out = opt.open_output_file();
 
-    std::ofstream out = opt.open_output_file();
-
-    std::filesystem::path out_ground_path = add_prefix(opt.output_file, "_ground");
-    std::ofstream out_ground = 
-        opt.open_output_file(out_ground_path.string());
-
-    std::filesystem::path out_building_path = add_prefix(opt.output_file, "_building");
-    std::ofstream out_building = 
-        opt.open_output_file(out_building_path.string());
+    auto [out_ground, out_ground_filename] =
+        opt.open_output_file_suffix("_ground");
+    auto [out_building, out_building_filename] =
+        opt.open_output_file_suffix("_building");
 
     export_vrml(data,
                 out,
                 out_ground,
-                out_ground_path.string(),
+                out_ground_filename,
                 out_building,
-                out_building_path.string(),
+                out_building_filename,
                 opt.colorful_buildings);
 
     std::println("{}, {}, {}に出力しました",
                  opt.output_file.string(),
-                 out_ground_path.string(),
-                 out_building_path.string());
+                 out_ground_filename,
+                 out_building_filename);
 }
 
 void show_classify(const Option& opt) {
