@@ -118,6 +118,8 @@ void inspect(const Option& opt) {
     std::println("{}", "建物処理" | hl);
     process_building(data);
 
+    std::println("{}", "総合ビューア起動中" | hl);
+
     // 一時ファイルにデータを保存
     constexpr const char* temp_file = "inspector_temp.dat";
     {
