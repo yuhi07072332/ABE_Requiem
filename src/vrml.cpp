@@ -59,6 +59,8 @@ int write_delaunay_triangulation(std::ostream& os,
                                  const std::vector<Coord>& coords,
                                  const MapData& data,
                                  std::string_view diffuse_color) {
+    std::println(os, VRML_HEADER);
+
     constexpr std::string_view FMT1 = R"(
 Shape {{
     appearance Appearance {{
@@ -85,7 +87,17 @@ Shape {{
 
     std::vector<double> coords_vec;
     coords_vec.reserve(coords.size() * 2);
+
+    // 1. 有効な座標（NaN以外）だけを集めた新しい配列を作る
+    std::vector<Coord> valid_coords;
     for (Coord c : coords) {
+        if (!data.is_missing(c)) {
+            valid_coords.push_back(c);
+        }
+    }
+
+    // 2. この関数内で coords を使っていた箇所をすべて valid_coords に変える
+    for (Coord c : valid_coords) {
         Point p = data.point_at(c);
         coords_vec.push_back(p.x);
         coords_vec.push_back(p.z);

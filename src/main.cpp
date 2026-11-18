@@ -1,4 +1,3 @@
-#include <iostream>
 #include <exception>
 #include <format>
 #include <fstream>
@@ -48,8 +47,21 @@ void test(const Option& opt) {
     };
 
     size_t before = count_valid(data);
-    downsample_flat_points(data, 3, 0.1);
+    downsample_flat_points(data, 3, 10.0);
     size_t after = count_valid(data);
+
+// ▼ ここで有効な点のリスト（coords）を作る
+    std::vector<Coord> coords;
+    for (int i = 0; i < data.rows; ++i) {
+        for (int j = 0; j < data.cols; ++j) {
+            if (!data.is_missing(i, j)) {
+                coords.push_back(Coord{i, j});
+            }
+        }
+    }
+
+    std::ofstream ofs = open_output_file(opt);
+    write_delaunay_triangulation(ofs, coords, data);
 
     std::println("ファイル: {}", opt.input_file);
     std::println("処理前: {} 点", before);

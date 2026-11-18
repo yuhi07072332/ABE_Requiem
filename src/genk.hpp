@@ -82,7 +82,6 @@ std::map<int, int> calc_frequency(const std::vector<double>& heights,
 // 近い数値（高さ）の点を間引いてNaNにする
 void downsample_flat_points(MapData& data, int block_size, double height_threshold);
 
-
 /* ----- vrml ----- */
 
 inline constexpr std::string_view VRML_HEADER = "#VRML V2.0 utf8";
