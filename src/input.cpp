@@ -39,7 +39,7 @@ static BoundingBox read_points(const char* data_path) {
         if (std::sscanf(buf.data(), "%10lf%10lf%10lf", &x, &z, &y) != 3) {
             throw std::runtime_error("read_points(): 読み込み失敗しました");
         }
-        pts.push_back({(int)x, (int)z, y});
+        pts.push_back({x, y, z});
         min_x = std::min(min_x, (int)x);
         min_z = std::min(min_z, (int)z);
         max_x = std::max(max_x, (int)x);
@@ -74,6 +74,7 @@ MapData read_map(std::string_view data_path) {
     return MapData {
         .grid = std::move(grid),
         .types = std::vector(rows * cols, Type::Unknown),
+        .buildings = std::vector<Building>(),
         .x = min_x,
         .z = min_z,
         .rows = rows,

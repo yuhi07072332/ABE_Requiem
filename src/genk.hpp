@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <map>
+#include <set>
 #include <string_view>
 #include <cmath>
 #include <iosfwd>
@@ -9,8 +10,7 @@
 
 /// VRMLでの座標を表す
 struct Point {
-    int x, z;
-    double y;
+    double x, y, z;
 };
 
 /// 行列内の位置を表す
@@ -25,12 +25,25 @@ struct Coord {
     Coord operator-(Coord other) const { return {i - other.i, j - other.j}; }
 };
 
-// 点の種類
+struct Building {
+    std::set<Coord> coords;
+    std::vector<std::vector<Coord>> outline_paths;
+    bool has_inner = false;
+
+    Coord top_left = {std::numeric_limits<int>::max(),
+                      std::numeric_limits<int>::max()};
+    Coord bottom_right = {0, 0};
+
+    void append(Coord c);
+};
+
+/// 点の種類
 enum class Type : uint8_t {
-    Unknown,                // 未知
-    Ground,                 // 地面
-    Building,               // 建物
-    BuildingOutline,        // 建物(輪郭)
+    Unknown = 0,                // 未知
+    Ground,                     // 地面
+    Building,                   // 建物
+    BuildingOutline,            // 建物(輪郭)
+    Other,
 };
 
 /// @brief 地図から読み込んだデータ
@@ -42,6 +55,7 @@ enum class Type : uint8_t {
 struct MapData {
     std::vector<double> grid;
     std::vector<Type> types;
+    std::vector<Building> buildings;
 
     int x, z; // 地図の左下の座標
 
@@ -51,10 +65,17 @@ struct MapData {
     /// i行j列のz座標を取得
     double at(int i, int j) const { return grid.at(i * cols + j); }
     double at(Coord c) const { return grid.at(c.i * cols + c.j); }
+    /// i行j列のz座標を取得(書き換え可能)
+    double& at(int i, int j) { return grid.at(i * cols + j); }
+    double& at(Coord c) { return grid.at(c.i * cols + c.j); }
 
     /// i行j列に対応するPointを取得
     Point point_at(int i, int j) const {
-        return Point {x + j, z + i, at(i, j)};
+        return Point {
+            static_cast<double>(x) + j,
+            at(i, j),
+            static_cast<double>(z) + i
+        };
     }
     Point point_at(Coord c) const { return point_at(c.i, c.j); }
 
@@ -75,6 +96,21 @@ struct MapData {
     bool contains(Coord c) const { return contains(c.i, c.j); }
 };
 
+/* ----- utility ----- */
+
+std::ostream& operator<<(std::ostream&, Coord);
+std::ostream& operator<<(std::ostream&, Point);
+
+void show_mapdata_types(const MapData& data);
+void show_mapdata_heights(const MapData& data);
+void show_mapdata_buildings(const MapData& data);
+
+/* ----- building ----- */
+
+void process_building(MapData& data);
+
+void test_building_algor();
+
 /* ----- algorithm ----- */
 
 std::map<int, int> calc_frequency(const std::vector<double>& heights,
@@ -82,23 +118,30 @@ std::map<int, int> calc_frequency(const std::vector<double>& heights,
 // 近い数値（高さ）の点を間引いてNaNにする
 void downsample_flat_points(MapData& data, int block_size, double height_threshold);
 
+/* ----- missing ----- */
+
+/// 欠損点補完
+void fill_missing(MapData& data);
+
+
 /* ----- vrml ----- */
 
 inline constexpr std::string_view VRML_HEADER = "#VRML V2.0 utf8";
 
 void write_elevation_grid(std::ostream& os, const MapData& data);
-int write_delaunay_triangulation(std::ostream& os,
-                                 const std::vector<Coord>& coords,
-                                 const MapData& data,
-                                 std::string_view diffuse_color = "0.3 0.5 0.7");
+
+void export_vrml(const MapData& data,
+                std::ostream& out,
+                std::ostream& out_ground,
+                std::string_view out_ground_filename,
+                std::ostream& out_building,
+                std::string_view out_building_filename,
+                bool colorful_buildings);
 
 /* ----- input ----- */
 
 MapData read_map(std::string_view data_path);
 
-/* ----- building ----- */
+/* ----- clあssいfAI ----- */
 
-void test_building_algor();
-
-std::ostream& operator<<(std::ostream&, Coord);
-std::ostream& operator<<(std::ostream&, Point);
+void classify_map(MapData& data);

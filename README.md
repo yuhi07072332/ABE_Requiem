@@ -59,3 +59,9 @@ src/  ← ソースコード
 
 - `src/`下の全ての`.cpp`ファイルは自動的にコンパイルの対象となるので、テストなどの用途で
 臨時的なcppファイルを作成したい場合は`src/`下に置かないでください
+
+## Visualizer
+
+```
+pip install -r visualizer/requirement.txt
+```

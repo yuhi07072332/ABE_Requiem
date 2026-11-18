@@ -1,8 +1,11 @@
+#include <exception>
 #include <ostream>
 #include <string_view>
 #include <print>
 #include <vector>
 #include <cstddef>
+#include <ranges>
+#include <array>
 
 #include "third_party/delaunator/delaunator.hpp"
 
@@ -10,8 +13,6 @@
 
 /// 点群をElevationGridで出力
 void write_elevation_grid(std::ostream& os, const MapData& data) {
-    std::println(os, VRML_HEADER);
-
     constexpr std::string_view FMT1 = R"(
 Shape {{
    appearance Appearance {{
@@ -52,16 +53,8 @@ Shape {{
     std::print(os, FMT2);
 }
 
-/// @brief 点群に対しドロネーの三角形分割を実行し、IndexFacedSetとして出力
-/// @returns 三角形の面数
 
-int write_delaunay_triangulation(std::ostream& os,
-                                 const std::vector<Coord>& coords,
-                                 const MapData& data,
-                                 std::string_view diffuse_color) {
-    std::println(os, VRML_HEADER);
-
-    constexpr std::string_view FMT1 = R"(
+constexpr std::string_view INDEXEDFACESET_FMT1 = R"(
 Shape {{
     appearance Appearance {{
         material Material {{
@@ -73,18 +66,24 @@ Shape {{
             point [
 )";
 
-    constexpr std::string_view FMT2 = R"(
+constexpr std::string_view INDEXEDFACESET_FMT2 = R"(
         ]
         }}
         coordIndex [
 )";
 
-    constexpr std::string_view FMT3 = R"(
+constexpr std::string_view INDEXEDFACESET_FMT3 = R"(
         ]
     }}
 }}
 )";
 
+/// @brief 点群に対しドロネーの三角形分割を実行し、IndexFacedSetとして出力
+/// @returns 三角形の面数
+static int write_delaunay_triangulation(std::ostream& os,
+                                 const std::vector<Coord>& coords,
+                                 const MapData& data,
+                                 std::string_view diffuse_color) {
     std::vector<double> coords_vec;
     coords_vec.reserve(coords.size() * 2);
 
@@ -103,25 +102,218 @@ Shape {{
         coords_vec.push_back(p.z);
     }
 
+    if (coords.size() < 2) {
+        throw std::logic_error("write_delaunay_triangulation(): coordは最低2以上必要");
+    }
+
     delaunator::Delaunator d(coords_vec);
 
-    std::print(os, FMT1, diffuse_color);
+    std::print(os, INDEXEDFACESET_FMT1, diffuse_color);
 
     for (Coord c : coords) {
         Point p = data.point_at(c);
         std::println(os, "{} {} {},", p.x, p.y, p.z);
     }
 
-    std::print(os, FMT2);
+    std::print(os, INDEXEDFACESET_FMT2);
 
     for (std::size_t i = 0; i < d.triangles.size(); i += 3) {
         std::println(os,
                      "{}, {}, {}, -1",
-                     d.triangles[i],
-                     d.triangles[i + 1],
-                     d.triangles[i + 2]);
+                     d.triangles.at(i),
+                     d.triangles.at(i + 1),
+                     d.triangles.at(i + 2));
     }
 
-    std::print(os, FMT3);
+    std::print(os, INDEXEDFACESET_FMT3);
     return d.triangles.size() / 3;
+
+}
+
+/// @brief 建物をIndexFacedSetとして出力
+///
+/// @returns 面数
+static int write_building(std::ostream& os,
+                    const MapData& data,
+                    const Building& building,
+                    std::string_view diffuse_color) {
+    auto is_building = [&](Coord c) {
+        return data.contains(c)
+            && (data.type_at(c) == Type::Building 
+            || data.type_at(c) == Type::BuildingOutline);
+    };
+
+    std::vector<Point> vertices;
+    std::vector<std::array<int, 4>> faces; 
+
+    // 壁
+    for (const auto& outline : building.outline_paths) {
+        for (Coord c : outline) {
+            const int base = vertices.size();
+
+            auto add_face = [&](std::array<int, 4> indices) {
+                for (int& i : indices) i += base;
+                faces.push_back(indices);
+            };
+
+            auto [x, y, z] = data.point_at(c);
+
+            std::array<Point, 8> coord_vertices{{
+                {x - 0.5, -30, z - 0.5},
+                {x + 0.5, -30, z - 0.5},
+                {x + 0.5, -30, z + 0.5},
+                {x - 0.5, -30, z + 0.5},
+
+                {x - 0.5, y, z - 0.5},
+                {x + 0.5, y, z - 0.5},
+                {x + 0.5, y, z + 0.5},
+                {x - 0.5, y, z + 0.5},
+            }};
+
+            vertices.append_range(coord_vertices);
+
+            if (!is_building(c + Coord{-1, 0})) 
+                add_face({0, 4, 5, 1});
+            if (!is_building(c + Coord{0, 1})) 
+                add_face({1, 5, 6, 2});
+            if (!is_building(c + Coord{1, 0})) 
+                add_face({2, 6, 7, 3});
+            if (!is_building(c + Coord{0, -1})) 
+                add_face({3, 7, 4, 0});
+        }
+    }
+
+    std::print(os, INDEXEDFACESET_FMT1, diffuse_color);
+
+    for (auto p : vertices) 
+        std::println(os, "{} {} {},", p.x, p.y, p.z);
+
+    std::print(os, INDEXEDFACESET_FMT2);
+
+    for (auto face : faces) 
+        std::println(os, "{}, {}, {}, {} -1", face[0], face[1], face[2], face[3]);
+
+    std::print(os, INDEXEDFACESET_FMT3);
+
+    // 屋上
+    if (building.coords.size() >= 2) {
+        try {
+            write_delaunay_triangulation(
+                os,
+                std::vector<Coord>(std::from_range, building.coords),
+                data,
+                diffuse_color
+            );
+        } catch (std::exception& e) {
+
+        }
+    }
+
+    return faces.size();
+}
+
+struct RGB {
+    double r, g, b;
+};
+
+RGB hsv_to_rgb(double h, double s, double v) {
+    h = std::fmod(h, 360.0);
+    if (h < 0.0) h += 360.0;
+
+    const double c = v * s;
+    const double x = c * (1.0 - std::abs(std::fmod(h / 60.0, 2.0) - 1.0));
+    const double m = v - c;
+
+    RGB rgb;
+
+    if      (h < 60)  rgb = {c, x, 0};
+    else if (h < 120) rgb = {x, c, 0};
+    else if (h < 180) rgb = {0, c, x};
+    else if (h < 240) rgb = {0, x, c};
+    else if (h < 300) rgb = {x, 0, c};
+    else              rgb = {c, 0, x};
+
+    return {rgb.r + m, rgb.g + m, rgb.b + m};
+}
+
+
+/// @brief 全てのVRML化を行う
+///
+/// @param out メインとなるwrlを出力するためのostream
+/// @param out_ground 地面部分を出力するためのostream
+/// @param out_building 建物部分を出力するためのostream
+/// @param out_ground_filename out_groundに対応ファイル名
+/// @param out_building_filename out_buildingに対応ファイル名
+/// @param colorful_buildings 建物それぞれについて色分けするか
+void export_vrml(const MapData& data,
+                std::ostream& out,
+                std::ostream& out_ground,
+                std::string_view out_ground_filename,
+                std::ostream& out_building,
+                std::string_view out_building_filename,
+                bool colorful_buildings) {
+    auto building_color = [&](std::size_t index) -> std::string {
+        constexpr double GOLDEN_ANGLE = 137.50776405003785;
+
+        const double hue = std::fmod(index * GOLDEN_ANGLE, 360.0);
+
+        constexpr double saturation = 0.65;
+        constexpr double value = 0.90;
+
+        const RGB rgb = hsv_to_rgb(hue, saturation, value);
+
+        return std::format("{:.4f} {:.4f} {:.4f}",
+                           rgb.r, rgb.g, rgb.b);
+    };
+
+
+    constexpr std::string_view MAIN_VRML = R"({}
+Inline {{
+    url "{}"
+}}
+
+Inline {{
+    url "{}"
+}}
+)";
+
+    std::vector<Coord> ground_coords;
+
+    for (int i = 0; i < data.rows; ++i) { 
+        for (int j = 0; j < data.cols; ++j) {
+            switch (data.type_at(i, j)) {
+                case Type::Ground: 
+                case Type::Unknown: ground_coords.emplace_back(i, j);
+                    break;
+                default: break;
+            }
+        }
+    }
+
+    std::print(out, 
+               MAIN_VRML,
+               VRML_HEADER, 
+               out_ground_filename,
+               out_building_filename);
+    
+    std::print(out_ground, VRML_HEADER);
+    if (colorful_buildings) {
+        write_delaunay_triangulation(out_ground, ground_coords, data, "0.3 0.3 0.3");
+    } else {
+        write_delaunay_triangulation(out_ground, ground_coords, data, "0.25 0.5 1");
+    }
+
+    std::print(out_building, VRML_HEADER);
+
+    if (colorful_buildings) {
+        for (const auto& [i, building] 
+            : data.buildings | std::views::enumerate) {
+            write_building(out_building, data, building, building_color(i));
+        }
+    } else {
+        for (const auto& building : data.buildings) {
+            write_building(out_building, data, building, "1 0.5 0.25");
+        }
+    }
+
 }
