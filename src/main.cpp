@@ -141,7 +141,36 @@ void inspect(const Option& opt) {
         throw std::runtime_error("inspect: integrated viewer failed to start");
 }
 
-void test() {
+void test(const Option& opt) {
+    MapData data = read_map(opt.input_file);
+
+    auto count_valid = [](const MapData& d) {
+        return std::count_if(d.grid.begin(), d.grid.end(), [](double y) {
+            return !std::isnan(y);
+        });
+    };
+
+    size_t before = count_valid(data);
+    downsample_flat_points(data, 3, 10.0);
+    size_t after = count_valid(data);
+
+// ▼ ここで有効な点のリスト（coords）を作る
+    std::vector<Coord> coords;
+    for (int i = 0; i < data.rows; ++i) {
+        for (int j = 0; j < data.cols; ++j) {
+            if (!data.is_missing(i, j)) {
+                coords.push_back(Coord{i, j});
+            }
+        }
+    }
+
+    std::ofstream ofs = open_output_file(opt);
+    write_delaunay_triangulation(ofs, coords, data);
+
+    std::println("ファイル: {}", opt.input_file);
+    std::println("処理前: {} 点", before);
+    std::println("処理後: {} 点", after);
+    std::println("削減数: {} 点", before - after);
 }
 
 // ┌                                                         ┐
