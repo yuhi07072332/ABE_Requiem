@@ -164,7 +164,7 @@ void test(const Option& opt) {
         }
     }
 
-    std::ofstream ofs = open_output_file(opt);
+    std::ofstream ofs = opt.open_output_file();
     write_delaunay_triangulation(ofs, coords, data);
 
     std::println("ファイル: {}", opt.input_file);

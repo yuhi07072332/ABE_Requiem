@@ -80,7 +80,7 @@ constexpr std::string_view INDEXEDFACESET_FMT3 = R"(
 
 /// @brief 点群に対しドロネーの三角形分割を実行し、IndexFacedSetとして出力
 /// @returns 三角形の面数
-static int write_delaunay_triangulation(std::ostream& os,
+int write_delaunay_triangulation(std::ostream& os,
                                  const std::vector<Coord>& coords,
                                  const MapData& data,
                                  std::string_view diffuse_color) {
