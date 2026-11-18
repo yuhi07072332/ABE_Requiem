@@ -62,10 +62,15 @@ struct MapData {
     int rows; // 行数(z軸方向の長さ)
     int cols; // 列数(x軸方向の長さ)
 
+    // 点群数
+    int ground_coords = 0;
+    int building_coords = 0;
+    int building_outline_coords = 0;
+    int other_coords = 0;
+
     /// i行j列のz座標を取得
     double at(int i, int j) const { return grid.at(i * cols + j); }
     double at(Coord c) const { return grid.at(c.i * cols + c.j); }
-    /// i行j列のz座標を取得(書き換え可能)
     double& at(int i, int j) { return grid.at(i * cols + j); }
     double& at(Coord c) { return grid.at(c.i * cols + c.j); }
 
@@ -118,8 +123,7 @@ std::map<int, int> calc_frequency(const std::vector<double>& heights,
 
 /* ----- smooth ------ */
 
-// 近い数値（高さ）の点を間引いてNaNにする
-void downsample_flat_points(MapData& data, int block_size, double height_threshold);
+void smooth_ground(MapData& data);
 
 /* ----- missing ----- */
 

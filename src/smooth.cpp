@@ -1,10 +1,22 @@
 #include <algorithm>
+#include <cassert>
 #include <limits>
+#include <print>
 
 #include "genk.hpp"
+#include "third_party/decoterm.hpp"
 
-// 1ブロック内の間引き処理（このファイル内でのみ使用するため static）
-static void downsample_block(MapData& data, int start_i, int start_j, int block_size, double height_threshold) {
+/// @brief 1ブロック内の間引き処理（このファイル内でのみ使用するため static）
+///
+/// @param filter Coordを受け取ってboolを返す関数。trueを返された場合のみ処理の対象となる
+/// @returns 削減数
+template <typename F>
+static unsigned int downsample_block(MapData& data,
+                             int start_i,
+                             int start_j,
+                             int block_size,
+                             double height_threshold,
+                             const F& filter) {
     int end_i = std::min(start_i + block_size, data.rows);
     int end_j = std::min(start_j + block_size, data.cols);
 
@@ -17,6 +29,7 @@ static void downsample_block(MapData& data, int start_i, int start_j, int block_
     for (int i = start_i; i < end_i; ++i) {
         for (int j = start_j; j < end_j; ++j) {
             if (data.is_missing(i, j)) continue;
+            if (!filter(Coord{i, j})) continue;
 
             double y = data.at(i, j);
             min_y = std::min(min_y, y);
@@ -31,27 +44,68 @@ static void downsample_block(MapData& data, int start_i, int start_j, int block_
 
     // 有効点がない、または高さの差が閾値より大きい（変化が大きい）場合は消さない
     if (rep_i == -1 || (max_y - min_y) > height_threshold) {
-        return;
+        return 0;
     }
 
     // 数値が近い集まりとみなし、代表点以外を NaN にして消す
     const double nan_val = std::numeric_limits<double>::quiet_NaN();
+    unsigned int count = 0;
     for (int i = start_i; i < end_i; ++i) {
         for (int j = start_j; j < end_j; ++j) {
             if (i == rep_i && j == rep_j) continue;
-            data.grid[i * data.cols + j] = nan_val;
-            // 必要に応じて type もリセットする場合は以下を有効化
-            // data.type_at(i, j) = Type::Unknown;
+            if (data.is_missing(i, j)) continue;
+            if (!filter(Coord{i, j})) continue;
+            data.at(i, j) = nan_val;
+            count ++;
         }
     }
+
+    return count;
 }
 
-void downsample_flat_points(MapData& data, int block_size, double height_threshold) {
-    if (block_size <= 1) return;
+/// @returns 削減した点の数
+template <typename F>
+unsigned int downsample_flat_points(MapData& data,
+                            int block_size,
+                            double height_threshold,
+                            const F& filter) {
+    if (block_size <= 1) return 0;
 
+    unsigned int count = 0;
     for (int i = 0; i < data.rows; i += block_size) {
         for (int j = 0; j < data.cols; j += block_size) {
-            downsample_block(data, i, j, block_size, height_threshold);
+            count += downsample_block(
+                data,
+                i,
+                j,
+                block_size,
+                height_threshold,
+                filter
+            );
         }
     }
+    return count;
+}
+
+/// 地面の平滑化を行う
+void smooth_ground(MapData& data) {
+    int before = data.ground_coords;
+    int erased = 0;
+
+    for (int i = 1; i <= 16; i *= 2) {
+        const int block_size = 2 * i;
+        const double threshold = 0.1 * i;
+        erased += downsample_flat_points(data, block_size, threshold, [&](Coord c){
+            return data.type_at(c) == Type::Ground;
+        });
+    }
+
+    int after = before - erased;
+
+    data.ground_coords = after;
+
+    std::println("地面平滑化: {} -> {} ({}%)",
+                 before,
+                 after,
+                 -(erased * 100 / before) | deco::fg(deco::bright_yellow));
 }

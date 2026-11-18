@@ -281,18 +281,17 @@ Inline {{
 
     for (int i = 0; i < data.rows; ++i) { 
         for (int j = 0; j < data.cols; ++j) {
+            if (data.is_missing(i, j)) continue;
             switch (data.type_at(i, j)) {
-                case Type::Ground: 
-                case Type::Unknown: ground_coords.emplace_back(i, j);
-                    break;
+                case Type::Ground: ground_coords.emplace_back(i, j); break;
                 default: break;
             }
         }
     }
 
-    std::print(out, 
+    std::print(out,
                MAIN_VRML,
-               VRML_HEADER, 
+               VRML_HEADER,
                out_ground_filename,
                out_building_filename);
     
@@ -302,7 +301,6 @@ Inline {{
     } else {
         write_delaunay_triangulation(out_ground, ground_coords, data, "0.25 0.5 1");
     }
-
     std::print(out_building, VRML_HEADER);
 
     if (colorful_buildings) {

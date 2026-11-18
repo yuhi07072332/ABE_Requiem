@@ -259,8 +259,8 @@ static void validate_buildings(std::vector<Building>& buildings, MapData& data) 
     }
 }
 
-/// @brief 分類結果の点数を集計して標準出力に表示する
-static void print_classification_summary(const MapData& data, double threshold) {
+/// @brief 分類結果をMapDataに格納し、標準出力に表示する
+static void print_classification_summary(MapData& data, double threshold) {
     std::size_t ground_cnt = 0;
     std::size_t building_cnt = 0;
     std::size_t building_outline_cnt = 0;
@@ -288,6 +288,11 @@ static void print_classification_summary(const MapData& data, double threshold) 
             }
         }
     }
+
+    data.ground_coords = ground_cnt;
+    data.building_coords = building_cnt;
+    data.building_outline_coords = building_outline_cnt;
+    data.other_coords = other_cnt;
 
     std::println("分類完了 (初期地面しきい値: {:.2f}m)", threshold);
     std::println("  建物数: {}\n", data.buildings.size());
