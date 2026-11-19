@@ -113,7 +113,6 @@ void show_mapdata_buildings(const MapData& data);
 /* ----- building ----- */
 
 void process_building(MapData& data);
-
 void test_building_algor();
 
 /* ----- algorithm ----- */
@@ -121,26 +120,25 @@ void test_building_algor();
 std::map<int, int> calc_frequency(const std::vector<double>& heights,
                                   int width = 5);
 
-/* ----- smooth ------ */
-
-void smooth_ground(MapData& data);
-
 /* ----- missing ----- */
 
 /// 欠損点補完
 void fill_missing(MapData& data);
+
+/* ----- smooth ------ */
+
+void smooth_ground(MapData& data);
+void smooth_buildings(MapData& data);
 
 /* ----- vrml ----- */
 
 inline constexpr std::string_view VRML_HEADER = "#VRML V2.0 utf8";
 
 void write_elevation_grid(std::ostream& os, const MapData& data);
-
 int write_delaunay_triangulation(std::ostream& os,
                                  const std::vector<Coord>& coords,
                                  const MapData& data,
                                  std::string_view diffuse_color = "0.5 0.5 0.5");
-
 void export_vrml(const MapData& data,
                 std::ostream& out,
                 std::ostream& out_ground,

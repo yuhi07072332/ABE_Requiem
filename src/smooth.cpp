@@ -68,12 +68,14 @@ template <typename F>
 unsigned int downsample_flat_points(MapData& data,
                             int block_size,
                             double height_threshold,
-                            const F& filter) {
+                            const F& filter,
+                            Coord top_left,
+                            Coord bottom_right) {
     if (block_size <= 1) return 0;
 
     unsigned int count = 0;
-    for (int i = 0; i < data.rows; i += block_size) {
-        for (int j = 0; j < data.cols; j += block_size) {
+    for (int i = top_left.i; i <= bottom_right.i; i += block_size) {
+        for (int j = top_left.j; j <= bottom_right.j; j += block_size) {
             count += downsample_block(
                 data,
                 i,
@@ -95,9 +97,14 @@ void smooth_ground(MapData& data) {
     for (int i = 1; i <= 16; i *= 2) {
         const int block_size = 2 * i;
         const double threshold = 0.1 * i;
-        erased += downsample_flat_points(data, block_size, threshold, [&](Coord c){
-            return data.type_at(c) == Type::Ground;
-        });
+        erased += downsample_flat_points(
+            data,
+            block_size,
+            threshold,
+            [&](Coord c){ return data.type_at(c) == Type::Ground; },
+            {0, 0},
+            {data.rows - 1, data.cols - 1}
+        );
     }
 
     int after = before - erased;
@@ -105,6 +112,36 @@ void smooth_ground(MapData& data) {
     data.ground_coords = after;
 
     std::println("地面平滑化: {} -> {} ({}%)",
+                 before,
+                 after,
+                 -(erased * 100 / before) | deco::fg(deco::bright_yellow));
+}
+
+/// 建物の平滑化を行う
+void smooth_buildings(MapData& data) {
+    int before = data.building_coords;
+    int erased = 0;
+
+    for (const auto& building : data.buildings) {
+        for (int i = 1; i <= 16; i *= 2) {
+            const int block_size = 2 * i;
+            const double threshold = 0.1 * i;
+            erased += downsample_flat_points(
+                data,
+                block_size,
+                threshold,
+                [&](Coord c){ return building.coords.contains(c) && data.type_at(c) == Type::Building; },
+                building.top_left,
+                building.bottom_right
+            );
+        }
+    }
+
+    int after = before - erased;
+
+    data.building_coords = after;
+
+    std::println("建物平滑化: {} -> {} ({}%)",
                  before,
                  after,
                  -(erased * 100 / before) | deco::fg(deco::bright_yellow));

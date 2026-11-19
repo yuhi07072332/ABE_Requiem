@@ -200,7 +200,9 @@ static int write_building(std::ostream& os,
         try {
             write_delaunay_triangulation(
                 os,
-                std::vector<Coord>(std::from_range, building.coords),
+                building.coords 
+                    | std::views::filter([&](Coord c){ return !data.is_missing(c);})
+                    | std::ranges::to<std::vector>(),
                 data,
                 diffuse_color
             );

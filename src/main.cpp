@@ -22,11 +22,15 @@ void exec_all(MapData& data) {
     std::println("{}", "欠損点補間" | hl);
     fill_missing(data);
 
+    std::println("{}", "建物処理" | hl);
+    process_building(data);
+
     std::println("{}", "地面平滑化" | hl);
     smooth_ground(data);
 
-    std::println("{}", "建物処理" | hl);
-    process_building(data);
+    std::println("{}", "建物平滑化" | hl);
+    smooth_buildings(data);
+
 
 }
 
