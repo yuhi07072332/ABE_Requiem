@@ -54,9 +54,20 @@ void Building::append(Coord c) {
 
 // clang-format on
 
-bool is_n4(Coord dir) { return dir.i == 0 || dir.j == 0; }
+static bool is_n4(Coord dir) { return dir.i == 0 || dir.j == 0; }
 
-auto indices(auto a, auto b) { return views::iota(decltype(b)(a), b); }
+static auto indices(auto a, auto b) { return views::iota(decltype(b)(a), b); }
+
+/// @brief buildingの内部でさらに輪郭を検出
+///
+/// @details BFS探索を行い、高さが8近傍の最低点とくらべ高い点をBuildingOutlineとする
+static void find_outlines(Building& building, MapData& data) {
+    const int rows = building.bottom_right.i - building.top_left.i + 1;
+    const int cols = building.bottom_right.j - building.top_left.j + 1;
+    std::set<Coord> visited;
+
+
+}
 
 struct TraceState {
     Coord current;
@@ -173,9 +184,8 @@ static void simplify_outline(Building& building, std::vector<Coord>& outline_pat
 }
 
 void process_building(MapData& data) {
-    std::println("建物削減中...");
+    std::println("建物輪郭削減中...");
     for (auto [n, building] : data.buildings | views::enumerate) {
-        // std::println("建物{}: {}, {} -> {}, {}", n, building.top_left.i, building.top_left.j, building.bottom_right.i, building.bottom_right.j);
         scan_outlines(data, building);
         for (auto& outline_path : building.outline_paths) {
             simplify_outline(building, outline_path);
