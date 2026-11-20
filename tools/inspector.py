@@ -20,9 +20,9 @@ from PySide6.QtWidgets import (
 )
 
 
-TYPE_NAMES = {0: "Unknown", 1: "Ground", 2: "Building", 3: "BuildingOutline"}
+TYPE_NAMES = {0: "Unknown", 1: "Ground", 2: "Building", 3: "BuildingOutline", 4: "Other"}
 TYPE_COLORS = np.array(
-    [[255, 255, 255], [0, 0, 255], [255, 0, 0], [0, 180, 0]], dtype=np.uint8
+    [[255, 255, 0], [0, 0, 255], [255, 0, 0], [0, 180, 0], [255, 255, 255]], dtype=np.uint8
 )
 
 
@@ -272,6 +272,7 @@ def main():
     output_selector.currentIndexChanged.connect(update_output)
     graphics.scene().sigMouseMoved.connect(lambda position: on_mouse_moved(position, view, image))
     elevation_graphics.scene().sigMouseMoved.connect(lambda position: on_mouse_moved(position, elevation_view, elevation_image_item))
+    missing_graphics.scene().sigMouseMoved.connect(lambda position: on_mouse_moved(position, missing_view, missing_image_item)) 
 
     # メインウィンドウのサイズを設定して表示
     window.resize(1100, 750)
