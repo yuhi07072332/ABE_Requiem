@@ -28,25 +28,45 @@ TYPE_COLORS = np.array(
 
 # データの読み込み
 def load_points(path):
-
-    # MAPDATA形式の読み込み
     with open(path, encoding="utf-8-sig") as source:
-        # 1行目: MAPDATA形式の確認
         first_line = source.readline().split()
-        if not first_line or first_line[0].lstrip("\uFEFF") != "MAPDATA":
-            raise ValueError(f"{path}: C++ inspectが出力したMAPDATA形式が必要です")
+        if (
+            len(first_line) != 2
+            or first_line[0] != "MAPDATA"
+            or first_line[1] != "1"
+        ):
+            raise ValueError(f"{path}: MAPDATA 1が必要です")
 
-        # 2行目: 行数、列数、原点座標
-        rows, cols, origin_x, origin_z = map(int, source.readline().split()[:4])
+        header = source.readline().split()
+        if len(header) < 4:
+            raise ValueError(f"{path}: ヘッダーが不正です")
 
-        # 3行目以降: 標高、分類、欠損点フラグ
-        values = np.loadtxt(source, dtype=float)
-        values = np.atleast_2d(values)
-        if values.shape[1] not in (2, 3):
-            raise ValueError(f"{path}: MAPDATAの列数が不正です")
-        
-        values = values.reshape(rows * cols, values.shape[1])
+        rows, cols, origin_x, origin_z = map(int, header[:4])
 
+        data_rows = []
+        smoothing = None
+
+        for line in source:
+            parts = line.split()
+            if not parts:
+                continue
+
+            if parts[0] == "SMOOTHING":
+                if len(parts) != 5:
+                    raise ValueError(f"{path}: SMOOTHING行が不正です")
+                smoothing = tuple(map(int, parts[1:]))
+                continue
+
+            if len(parts) not in (2, 3):
+                raise ValueError(f"{path}: MAPDATAの列数が不正です")
+            data_rows.append([float(value) for value in parts])
+
+        if len(data_rows) != rows * cols:
+            raise ValueError(
+                f"{path}: データ件数が不正です"
+            )
+
+        values = np.asarray(data_rows, dtype=float)
         heights = values[:, 0].reshape(rows, cols)
         embedded_types = values[:, 1].astype(np.uint8).reshape(rows, cols)
 
@@ -56,9 +76,17 @@ def load_points(path):
             else ~np.isfinite(heights)
         )
 
-        # 返却値: 標高、原点X座標、原点Z座標、分類、欠損点フラグ
-        return heights, origin_x, origin_z, embedded_types, missing
+        if smoothing is None:
+            smoothing = (0, 0, 0, 0)
 
+        return (
+            heights,
+            origin_x,
+            origin_z,
+            embedded_types,
+            missing,
+            *smoothing,
+        )
 
 
 # 分類画像の生成
@@ -117,14 +145,18 @@ def main():
         input_path = sys.argv[1]
     
     # データの読み込み
-    heights, origin_x, origin_z, types, missing_mask = load_points(input_path)
-    source_name = "C++ MapData"
+    (
+        heights, origin_x, origin_z, types, missing_mask,
+        ground_before, ground_erased, building_before, building_erased
+    ) = load_points(input_path)
+
+    source_name = "MapData"
 
     # GUIの構築
     window = QMainWindow()
 
     # ウィンドウタイトルの設定
-    window.setWindowTitle("ABE_Requiem 総合ビューア")
+    window.setWindowTitle("ABE_Requiem | Omnispect 1.2 Requiem")
     central = QWidget()
     layout = QHBoxLayout(central)
     window.setCentralWidget(central)
@@ -196,6 +228,19 @@ def main():
         histogram.addItem(bars)
     stack.addWidget(histogram)
 
+    # 削減率の計算
+    def reduction_rate(before, erased):
+        if before <= 0:
+            return 0.0
+        return erased / before * 100
+
+    ground_rate = reduction_rate(ground_before, ground_erased)
+    building_rate = reduction_rate(building_before, building_erased)
+
+    overall_before = ground_before + building_before
+    overall_erased = ground_erased + building_erased
+    overall_rate = reduction_rate(overall_before, overall_erased)
+
     # 右側のレイアウトと概要表示
     right = QWidget()
     right_layout = QVBoxLayout(right)
@@ -234,6 +279,22 @@ def main():
         class_table.setItem(row, 1, QTableWidgetItem(f"{count:,}"))
         class_table.setItem(row, 2, QTableWidgetItem(f"{count / heights.size * 100:.1f}%"))
     right_layout.addWidget(class_table)
+    
+    # 削減率の表示
+    right_layout.addWidget(QLabel("削減率"))
+
+    reduction_form = QFormLayout()
+    reduction_form.addRow("地面削減率", QLabel(f"{ground_rate:.1f}%"))
+    reduction_form.addRow("建物削減率", QLabel(f"{building_rate:.1f}%"))
+    right_layout.addLayout(reduction_form)
+
+    overall_label = QLabel(f"全体削減率  {overall_rate:.1f}%")
+    overall_label.setStyleSheet(
+        "font-size: 18px; font-weight: bold; color: #b45309;"
+    )
+    overall_label.setAlignment(Qt.AlignCenter)
+    right_layout.addWidget(overall_label)
+
     right_layout.addStretch()
     layout.addWidget(right)
 
