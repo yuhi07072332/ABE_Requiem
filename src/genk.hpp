@@ -62,10 +62,15 @@ struct MapData {
     int rows; // 行数(z軸方向の長さ)
     int cols; // 列数(x軸方向の長さ)
 
+    // 点群数
+    int ground_coords = 0;
+    int building_coords = 0;
+    int building_outline_coords = 0;
+    int other_coords = 0;
+
     /// i行j列のz座標を取得
     double at(int i, int j) const { return grid.at(i * cols + j); }
     double at(Coord c) const { return grid.at(c.i * cols + c.j); }
-    /// i行j列のz座標を取得(書き換え可能)
     double& at(int i, int j) { return grid.at(i * cols + j); }
     double& at(Coord c) { return grid.at(c.i * cols + c.j); }
 
@@ -108,33 +113,32 @@ void show_mapdata_buildings(const MapData& data);
 /* ----- building ----- */
 
 void process_building(MapData& data);
-
 void test_building_algor();
 
 /* ----- algorithm ----- */
 
 std::map<int, int> calc_frequency(const std::vector<double>& heights,
                                   int width = 5);
-// 近い数値（高さ）の点を間引いてNaNにする
-void downsample_flat_points(MapData& data, int block_size, double height_threshold);
 
 /* ----- missing ----- */
 
 /// 欠損点補完
 void fill_missing(MapData& data);
 
+/* ----- smooth ------ */
+
+void smooth_ground(MapData& data);
+void smooth_buildings(MapData& data);
 
 /* ----- vrml ----- */
 
 inline constexpr std::string_view VRML_HEADER = "#VRML V2.0 utf8";
 
 void write_elevation_grid(std::ostream& os, const MapData& data);
-
 int write_delaunay_triangulation(std::ostream& os,
                                  const std::vector<Coord>& coords,
                                  const MapData& data,
                                  std::string_view diffuse_color = "0.5 0.5 0.5");
-
 void export_vrml(const MapData& data,
                 std::ostream& out,
                 std::ostream& out_ground,

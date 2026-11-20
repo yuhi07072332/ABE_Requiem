@@ -4,6 +4,7 @@
 #include <iosfwd>
 #include <functional>
 #include <filesystem>
+#include <utility>
 #include <string_view>
 
 struct Option {
@@ -13,13 +14,9 @@ struct Option {
     
     bool colorful_buildings = false;
 
-    /// `output_file`をオープンし、`ofstream`を返す
     std::ofstream open_output_file() const;
-    std::ofstream open_output_file(std::string_view filename) const;
+    std::pair<std::ofstream, std::string> open_output_file_suffix(std::string_view suffix) const;
 };
-
-std::filesystem::path add_prefix(const std::filesystem::path& path,
-                                 std::string_view prefix);
 
 Option parse_args(int argc, const char** argv);
 

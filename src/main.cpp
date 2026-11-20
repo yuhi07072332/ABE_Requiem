@@ -11,6 +11,29 @@
 #include "cli.hpp"
 #include "genk.hpp"
 
+constexpr deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
+
+/// 全てのアルゴリズムを実行
+void exec_all(MapData& data) {
+
+    std::println("{}", "分類" | hl);
+    classify_map(data);
+
+    std::println("{}", "欠損点補間" | hl);
+    fill_missing(data);
+
+    std::println("{}", "建物処理" | hl);
+    process_building(data);
+
+    std::println("{}", "地面平滑化" | hl);
+    smooth_ground(data);
+
+    std::println("{}", "建物平滑化" | hl);
+    smooth_buildings(data);
+
+
+}
+
 // ┌                                                         ┐
 // │                        コマンド                         │
 // └                                                         ┘
@@ -36,43 +59,29 @@ void gen_points(const Option& opt) {
 }
 
 void all(const Option& opt) {
-    const deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
-
     MapData data = read_map(opt.input_file);
-
-    std::println("{}", "分類" | hl);
-    classify_map(data);
-
-    std::println("{}", "欠損点補間" | hl);
-    fill_missing(data);
-
-    std::println("{}", "建物処理" | hl);
-    process_building(data);
+    exec_all(data);
 
     std::println("{}", "VRML化" | hl);
+    auto out = opt.open_output_file();
 
-    std::ofstream out = opt.open_output_file();
-
-    std::filesystem::path out_ground_path = add_prefix(opt.output_file, "_ground");
-    std::ofstream out_ground = 
-        opt.open_output_file(out_ground_path.string());
-
-    std::filesystem::path out_building_path = add_prefix(opt.output_file, "_building");
-    std::ofstream out_building = 
-        opt.open_output_file(out_building_path.string());
+    auto [out_ground, out_ground_filename] =
+        opt.open_output_file_suffix("_ground");
+    auto [out_building, out_building_filename] =
+        opt.open_output_file_suffix("_building");
 
     export_vrml(data,
                 out,
                 out_ground,
-                out_ground_path.string(),
+                out_ground_filename,
                 out_building,
-                out_building_path.string(),
+                out_building_filename,
                 opt.colorful_buildings);
 
     std::println("{}, {}, {}に出力しました",
                  opt.output_file.string(),
-                 out_ground_path.string(),
-                 out_building_path.string());
+                 out_ground_filename,
+                 out_building_filename);
 }
 
 void show_classify(const Option& opt) {
@@ -93,16 +102,13 @@ void show_heights(const Option& opt) {
 }
 
 void inspect(const Option& opt) {
-    const deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
-
     // 入力ファイルが指定されていない場合はエラー
     if (opt.input_file.empty())
         throw std::runtime_error("inspect: input file is required");
 
     MapData data = read_map(opt.input_file);
 
-    std::println("{}", "分類" | hl);
-    classify_map(data);
+    exec_all(data);
 
     // 元々欠損点だったかどうかを記録する配列
     std::vector<bool> originally_missing(data.rows * data.cols);
@@ -111,14 +117,6 @@ void inspect(const Option& opt) {
             originally_missing[i * data.cols + j] = data.is_missing(i, j);
         }
     }
-
-    std::println("{}", "欠損点補間" | hl);
-    fill_missing(data);
-
-    std::println("{}", "建物処理" | hl);
-    process_building(data);
-
-    std::println("{}", "総合ビューア起動中" | hl);
 
     // 一時ファイルにデータを保存
     constexpr const char* temp_file = "inspector_temp.dat";
@@ -143,37 +141,7 @@ void inspect(const Option& opt) {
         throw std::runtime_error("inspect: integrated viewer failed to start");
 }
 
-void test(const Option& opt) {
-    MapData data = read_map(opt.input_file);
-
-    auto count_valid = [](const MapData& d) {
-        return std::count_if(d.grid.begin(), d.grid.end(), [](double y) {
-            return !std::isnan(y);
-        });
-    };
-
-    size_t before = count_valid(data);
-    downsample_flat_points(data, 3, 10.0);
-    size_t after = count_valid(data);
-
-// ▼ ここで有効な点のリスト（coords）を作る
-    std::vector<Coord> coords;
-    for (int i = 0; i < data.rows; ++i) {
-        for (int j = 0; j < data.cols; ++j) {
-            if (!data.is_missing(i, j)) {
-                coords.push_back(Coord{i, j});
-            }
-        }
-    }
-
-    std::ofstream ofs = opt.open_output_file();
-    write_delaunay_triangulation(ofs, coords, data);
-
-    std::println("ファイル: {}", opt.input_file);
-    std::println("処理前: {} 点", before);
-    std::println("処理後: {} 点", after);
-    std::println("削減数: {} 点", before - after);
-}
+void test() {}
 
 // ┌                                                         ┐
 // │                          main                           │
