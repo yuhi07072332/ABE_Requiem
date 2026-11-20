@@ -132,7 +132,7 @@ def main():
     # 左側のレイアウトと出力切り替え用のコンボボックス
     left = QVBoxLayout()
     output_selector = QComboBox()
-    output_selector.addItems(["分類", "標高", "ヒストグラム", "欠損点表示"])
+    output_selector.addItems(["分類", "標高", "欠損点表示", "ヒストグラム"])
     left.addWidget(output_selector)
     stack = QStackedWidget()
     left.addWidget(stack, 1)
@@ -160,6 +160,19 @@ def main():
     elevation_view.autoRange()
     stack.addWidget(elevation_graphics)
 
+    # 欠損点ビュー
+    missing_graphics = pg.GraphicsLayoutWidget()
+    missing_view = missing_graphics.addViewBox()
+    missing_view.setAspectLocked(True)
+    missing_view.invertY(True)
+    missing_image = np.where(
+        missing_mask[..., None], [255, 0, 0], [245, 245, 245]
+    ).astype(np.uint8)
+    missing_image_item = pg.ImageItem(missing_image, axisOrder="row-major")
+    missing_view.addItem(missing_image_item)
+    missing_view.autoRange()
+    stack.addWidget(missing_graphics)
+
     # ヒストグラムビュー
     histogram = pg.PlotWidget(title="標高分布 (1m間隔)")
     histogram.setLabel("bottom", "標高", units="m")
@@ -182,19 +195,6 @@ def main():
         )
         histogram.addItem(bars)
     stack.addWidget(histogram)
-
-    # 欠損点ビュー
-    missing_graphics = pg.GraphicsLayoutWidget()
-    missing_view = missing_graphics.addViewBox()
-    missing_view.setAspectLocked(True)
-    missing_view.invertY(True)
-    missing_image = np.where(
-        missing_mask[..., None], [255, 0, 0], [245, 245, 245]
-    ).astype(np.uint8)
-    missing_image_item = pg.ImageItem(missing_image, axisOrder="row-major")
-    missing_view.addItem(missing_image_item)
-    missing_view.autoRange()
-    stack.addWidget(missing_graphics)
 
     # 右側のレイアウトと概要表示
     right = QWidget()
@@ -245,7 +245,7 @@ def main():
             image.setImage(classification_image(types), autoLevels=False)
         elif index == 1:
             elevation_image_item.setImage(elevation_image(heights), autoLevels=False)
-        elif index == 3:
+        elif index == 2:
             missing_image_item.setImage(missing_image, autoLevels=False)
 
     # ビューア上でのマウス移動時の処理
