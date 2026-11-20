@@ -86,7 +86,7 @@ void all(const Option& opt) {
 
 void show_classify(const Option& opt) {
     MapData data = read_map(opt.input_file);
-    classify_map(data);
+    exec_all(data);
     show_mapdata_types(data);
 }
 

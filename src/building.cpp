@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <limits>
+#include <queue>
 #include <mdspan>
 #include <optional>
 #include <print>
@@ -23,6 +25,8 @@ using Matrix = std::mdspan<T, std::dextents<std::size_t, 2>>;
 using Bool = std::int8_t;
 
 // clang-format off
+
+constexpr double INNER_OUTLINE_THRESHOLD = 4;
 
 /// 4近傍
 [[maybe_unused]] constexpr std::array<Coord, 4> n4_dirs = {{
@@ -54,19 +58,65 @@ void Building::append(Coord c) {
 
 // clang-format on
 
-static bool is_n4(Coord dir) { return dir.i == 0 || dir.j == 0; }
+// static bool is_n4(Coord dir) { return dir.i == 0 || dir.j == 0; }
 
 static auto indices(auto a, auto b) { return views::iota(decltype(b)(a), b); }
 
 /// @brief buildingの内部でさらに輪郭を検出
 ///
 /// @details BFS探索を行い、高さが8近傍の最低点とくらべ高い点をBuildingOutlineとする
-static void find_outlines(Building& building, MapData& data) {
-    const int rows = building.bottom_right.i - building.top_left.i + 1;
-    const int cols = building.bottom_right.j - building.top_left.j + 1;
+static void find_outlines(const Building& building, MapData& data) {
     std::set<Coord> visited;
+    int count = 0;
 
+    auto n8_min_height = [&](Coord c) {
+        double min_height = std::numeric_limits<double>::max();
+        for (Coord dc : n8_dirs) {
+            Coord nc = c + dc;
+            if (!data.contains(nc)) continue;
+            if (data.type_at(nc) != Type::Building
+                || data.type_at(nc) != Type::BuildingOutline) continue;
+            min_height = std::min(min_height, data.at(nc));
+        }
+        return min_height;
+    };
 
+    auto bfs_from = [&](Coord start) {
+        assert(data.type_at(start) == Type::Building);
+        std::queue<Coord> queue;
+        queue.push(start);
+        visited.insert(start);
+
+        while (!queue.empty()) {
+            Coord c = queue.front();
+            queue.pop();
+
+            double diff = data.at(c) - n8_min_height(c);
+            if (diff >= INNER_OUTLINE_THRESHOLD) {
+                count ++;
+                data.type_at(c) = Type::BuildingOutline;
+            }
+
+            for (Coord dc : n8_dirs) {
+                Coord nc = c + dc;
+                if (!data.contains(nc) || visited.contains(nc)) continue;
+                if (data.type_at(nc) != Type::Building) continue;
+
+                queue.push(nc);
+                visited.insert(nc);
+            }
+        }
+    };
+
+    for (int i = building.top_left.i; i <= building.bottom_right.i; ++i) {
+        for (int j = building.top_left.j; j <= building.bottom_right.j; ++j) {
+            Coord c{i, j};
+            if (!building.coords.contains(c) || data.type_at(c) != Type::Building) continue;
+            if (visited.contains(c)) continue;
+            bfs_from(c);
+        }
+    }
+    std::println("added {} outlines", count);
 }
 
 struct TraceState {
@@ -184,6 +234,13 @@ static void simplify_outline(Building& building, std::vector<Coord>& outline_pat
 }
 
 void process_building(MapData& data) {
+    std::println("建物輪郭検出...");
+    for (const auto& building : data.buildings) {
+        find_outlines(building, data);
+    }
+
+    show_mapdata_types(data);
+
     std::println("建物輪郭削減中...");
     for (auto [n, building] : data.buildings | views::enumerate) {
         scan_outlines(data, building);
