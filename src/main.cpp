@@ -101,15 +101,14 @@ void show_heights(const Option& opt) {
     show_mapdata_heights(data);
 }
 
+
 void inspect(const Option& opt) {
     // 入力ファイルが指定されていない場合はエラー
     if (opt.input_file.empty())
         throw std::runtime_error("inspect: input file is required");
 
     MapData data = read_map(opt.input_file);
-
-    exec_all(data);
-
+    
     // 元々欠損点だったかどうかを記録する配列
     std::vector<bool> originally_missing(data.rows * data.cols);
     for (int i = 0; i < data.rows; ++i) {
@@ -117,6 +116,16 @@ void inspect(const Option& opt) {
             originally_missing[i * data.cols + j] = data.is_missing(i, j);
         }
     }
+
+    // アルゴリズムを実行１
+    std::println("{}", "分類" | hl);
+    classify_map(data);
+
+    std::println("{}", "欠損点補間" | hl);
+    fill_missing(data);
+
+    std::println("{}", "建物処理" | hl);
+    process_building(data);
 
     // 一時ファイルにデータを保存
     constexpr const char* temp_file = "inspector_temp.dat";
@@ -133,6 +142,13 @@ void inspect(const Option& opt) {
             }
         }
     }
+    
+    // アルゴリズムを実行２
+    std::println("{}", "地面平滑化" | hl);
+    smooth_ground(data);
+
+    std::println("{}", "建物平滑化" | hl);
+    smooth_buildings(data);
 
     // Pythonのビューアを起動
     const int result = std::system("python ./tools/inspector.py inspector_temp.dat");
