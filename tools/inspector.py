@@ -156,7 +156,7 @@ def main():
     window = QMainWindow()
 
     # ウィンドウタイトルの設定
-    window.setWindowTitle("ABE_Requiem | Omnispect 1.2 Requiem")
+    window.setWindowTitle("Omnispect 1.2 Requiem")
     central = QWidget()
     layout = QHBoxLayout(central)
     window.setCentralWidget(central)
