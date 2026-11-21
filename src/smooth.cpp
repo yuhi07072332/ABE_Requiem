@@ -4,7 +4,7 @@
 #include <print>
 
 #include "genk.hpp"
-#include "third_party/decoterm.hpp"
+#include <third_party/decoterm.hpp>
 
 /// @brief 1ブロック内の間引き処理（このファイル内でのみ使用するため static）
 ///

@@ -7,7 +7,7 @@
 #include <ranges>
 #include <array>
 
-#include "third_party/delaunator/delaunator.hpp"
+#include <third_party/delaunator/delaunator.hpp>
 
 #include "genk.hpp"
 

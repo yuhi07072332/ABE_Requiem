@@ -6,7 +6,7 @@
 #include <print>
 #include <string>
 
-#include "third_party/decoterm.hpp"
+#include <third_party/decoterm.hpp>
 
 #include "cli.hpp"
 #include "genk.hpp"
