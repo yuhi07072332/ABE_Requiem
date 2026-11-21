@@ -145,10 +145,23 @@ void inspect(const Option& opt) {
     
     // アルゴリズムを実行２
     std::println("{}", "地面平滑化" | hl);
+    const unsigned int ground_before = data.ground_coords;
     smooth_ground(data);
+    const unsigned int ground_erased = ground_before - data.ground_coords;
 
     std::println("{}", "建物平滑化" | hl);
+    const unsigned int building_before = data.building_coords;
     smooth_buildings(data);
+    const unsigned int building_erased = building_before - data.building_coords;
+
+    std::ofstream ofs{temp_file, std::ios::app};
+    std::println(ofs,
+                 "SMOOTHING {} {} {} {}",
+                 ground_before,
+                 ground_erased,
+                 building_before,
+                 building_erased);
+    ofs.close();
 
     // Pythonのビューアを起動
     const int result = std::system("python ./tools/inspector.py inspector_temp.dat");
