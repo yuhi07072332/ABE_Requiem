@@ -11,6 +11,8 @@
 #include <print>
 #include <cassert>
 
+#include <third_party/decoterm.hpp>
+
 #include "genk.hpp"
 
 namespace views = std::views;
@@ -53,7 +55,7 @@ void Building::append(Coord c) {
 
 // clang-format on
 
-bool is_n4(Coord dir) { return dir.i == 0 || dir.j == 0; }
+// bool is_n4(Coord dir) { return dir.i == 0 || dir.j == 0; }
 
 auto indices(auto a, auto b) { return views::iota(decltype(b)(a), b); }
 
@@ -101,12 +103,13 @@ static std::optional<TraceState> trace_next(TraceState state,
 
 /// @brief Moore neighborhood tracingを使ってbeginから建物の輪郭を時計回りに探索する 
 ///
+/// @details 輪郭が閉路でなかった場合はnulloptを返す
 /// 参考:
 /// https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/moore.html
-static std::vector<Coord> mnt(const MapData& data,
-                              Coord begin,
-                              const Building& building,
-                              const std::set<Coord>& visited) {
+static std::optional<std::vector<Coord>> mnt(const MapData& data,
+                                             Coord begin,
+                                             const Building& building,
+                                             const std::set<Coord>& visited) {
     assert(data.type_at(begin) == Type::BuildingOutline);
 
     // 輪郭が閉曲線じゃない場合の無限ループを防ぐため、stateが重複しているかどうかも判定する
@@ -125,18 +128,16 @@ static std::vector<Coord> mnt(const MapData& data,
         if (auto [_, inserted] = visited_state.insert(*curr_state); !inserted) break;
         curr_state = trace_next(*curr_state, data, building, visited);
         if (!curr_state.has_value()) break;
-        if (*curr_state == init_state) break;
+        if (*curr_state == init_state) return outline_path;
         assert(building.coords.contains(curr_state->current));
 
         outline_path.push_back(curr_state->current);
     }
 
-    return outline_path;
+    return std::nullopt;
 }
 
 /// @brief Buildingの全ての輪郭を時計回りの閉路としてoutline_pathsに格納
-///
-/// 輪郭が閉曲線じゃなかった場合は閉路ではなくパスとなる
 static void scan_outlines(const MapData& data, Building& building) {
     std::set<Coord> visited;
 
@@ -144,8 +145,9 @@ static void scan_outlines(const MapData& data, Building& building) {
         if (visited.contains(c)) continue;
         if (data.type_at(c) == Type::BuildingOutline) {
             auto outline = mnt(data, c, building, visited);
-            for (Coord c : outline) visited.insert(c);
-            building.outline_paths.emplace_back(std::move(outline));
+            if (!outline) continue;
+            for (Coord c : *outline) visited.insert(c);
+            building.outline_paths.emplace_back(std::move(*outline));
         }
     }
 }

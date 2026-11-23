@@ -1,7 +1,6 @@
 #include <cassert>
 #include <map>
 #include <ostream>
-#include <stdexcept>
 #include <string_view>
 #include <print>
 #include <vector>
