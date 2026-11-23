@@ -11,8 +11,6 @@
 #include <print>
 #include <cassert>
 
-#include <third_party/decoterm.hpp>
-
 #include "genk.hpp"
 
 namespace views = std::views;
