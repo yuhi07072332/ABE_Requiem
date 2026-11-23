@@ -25,6 +25,7 @@ struct Coord {
     Coord operator-(Coord other) const { return {i - other.i, j - other.j}; }
 };
 
+/// 建物
 struct Building {
     std::set<Coord> coords;
     std::vector<std::vector<Coord>> outline_paths;

@@ -1,6 +1,6 @@
 # ABE_Requiem
 
-画映1 ABE Requiem チームのリポジトリです。  
+画映1 ABE Requiem チームのリポジトリ
 
 [Gitチュートリアル](/git_tutor.md)  
 [コーディングマニュアル](/manual.md)  
@@ -9,29 +9,17 @@
 
 ```text
 src/  ← ソースコード
-└── third_party/  ← 外部ライブラリ
-    ├── argparse.hpp　← コマンドライン解析
-    ├── decoterm.hpp  ← 自作カラー出力ライブラリ(ドヤ)
-    └── delaunator/　 ← ドロネー三角形分割
+third_party/  ← 外部ライブラリ
+   ├── argparse.hpp　← コマンドライン解析
+   ├── decoterm.hpp  ← 自作カラー出力ライブラリ(ドヤ)
+   └── CDT/　        ← (制約付き)ドロネー三角形分割
 
 ```
 
 ## コンパイル
 
 > [!WARNING]
-> Windows環境では`g++`(バージョン14以上), `mingw32-make`, `cmake` が必要です。
-> 以下のコマンドで確認してください:
->
-> ```sh
-> g++ --version
-> mingw32-make --version
-> cmake --version
-> ```
->
-> `cmake`をインストールするには:
-> ```sh
-> winget install CMake
-> ```
+> `g++`(バージョン16以上), `mingw32-make`(Windows), `cmake` が必要です。
 
 - Windowsでは
 
@@ -60,8 +48,8 @@ src/  ← ソースコード
 - `src/`下の全ての`.cpp`ファイルは自動的にコンパイルの対象となるので、テストなどの用途で
 臨時的なcppファイルを作成したい場合は`src/`下に置かないでください
 
-## Visualizer
+## Inspector
 
 ```
-pip install -r visualizer/requirement.txt
+pip install -r tools/requirement.txt
 ```

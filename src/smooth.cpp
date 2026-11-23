@@ -130,7 +130,9 @@ void smooth_buildings(MapData& data) {
                 data,
                 block_size,
                 threshold,
-                [&](Coord c){ return building.coords.contains(c) && data.type_at(c) == Type::Building; },
+                [&](Coord c){ 
+                    return building.coords.contains(c) && data.type_at(c) == Type::Building;
+                },
                 building.top_left,
                 building.bottom_right
             );

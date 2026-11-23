@@ -60,10 +60,6 @@ static double calc_initial_ground_threshold(const MapData& data) {
     return valid_heights[ground_idx];
 }
 
-
-// TODO: 
-// 1. bfs_building(): 建物へUnknown取り込みに高さ条件を加える
-
 enum State : std::uint8_t{
     UnVisited = 0,
     Visited = 1,

@@ -165,10 +165,14 @@ static void simplify_outline(Building& building, std::vector<Coord>& outline_pat
         prev_dir = dir;
     }
 
-    for (Coord c : outline_path 
-        | views::filter([&](Coord c){ return !vertices.contains(c); })) {
-        building.coords.erase(c);
+    std::vector<Coord> simplified_path;
+
+    for (Coord c : outline_path) {
+        if (!vertices.contains(c)) building.coords.erase(c);
+        else simplified_path.push_back(c);
     }
+
+    outline_path = std::move(simplified_path);
 }
 
 void process_building(MapData& data) {

@@ -138,7 +138,7 @@ static int write_building_top(std::ostream& os,
         | views::filter([&](Coord c){ return !data.is_missing(c); });
 
     std::map<Coord, std::size_t> outline_indices;
-    for (auto [i, c] : building.coords | views::enumerate) {
+    for (auto [i, c] : valid_coords | views::enumerate) {
         if (data.type_at(c) != Type::BuildingOutline
             || data.is_missing(c)) continue;
         outline_indices.try_emplace(c, i);
@@ -155,7 +155,6 @@ static int write_building_top(std::ostream& os,
         for (std::size_t n = path.size(), i = 0; i < n; ++i) {
             const Coord c1 = path[i % n];
             const Coord c2 = path[(i + 1) % n];
-            if (!building.coords.contains(c1) || !building.coords.contains(c2)) continue;
                 edges.emplace_back(
                     outline_indices.at(c1),
                     outline_indices.at(c2)
