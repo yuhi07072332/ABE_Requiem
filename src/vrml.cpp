@@ -1,4 +1,5 @@
-#include <exception>
+#include <cassert>
+#include <map>
 #include <ostream>
 #include <string_view>
 #include <print>
@@ -6,10 +7,14 @@
 #include <cstddef>
 #include <ranges>
 #include <array>
+#include <format>
 
-#include "third_party/delaunator/delaunator.hpp"
+#include <third_party/CDT/CDT.hpp>
 
 #include "genk.hpp"
+#include "formatter.hpp"
+
+namespace views = std::views;
 
 /// 点群をElevationGridで出力
 void write_elevation_grid(std::ostream& os, const MapData& data) {
@@ -54,7 +59,26 @@ Shape {{
 }
 
 
-constexpr std::string_view INDEXEDFACESET_FMT1 = R"(
+
+static Point v2d_to_Point(CDT::V2d<double> v, const MapData& data) {
+    return Point {
+        .x = v.x,
+        .y = data.at(v.y - data.z, v.x - data.x),
+        .z = v.y
+    };
+}
+
+
+struct IndexedFaceSet {
+    std::string diffuse_color;
+    std::vector<Point> vertices;
+    std::vector<int64_t> faces;
+
+    IndexedFaceSet(std::string diffuse_color)
+        : diffuse_color(std::move(diffuse_color)) {}
+
+    void write_to(std::ostream& os) {
+        constexpr std::string_view FMT1 = R"(
 Shape {{
     appearance Appearance {{
         material Material {{
@@ -66,17 +90,34 @@ Shape {{
             point [
 )";
 
-constexpr std::string_view INDEXEDFACESET_FMT2 = R"(
-        ]
+        constexpr std::string_view FMT2 = R"(
+            ]
         }}
         coordIndex [
 )";
 
-constexpr std::string_view INDEXEDFACESET_FMT3 = R"(
+        constexpr std::string_view FMT3 = R"(
         ]
     }}
 }}
 )";
+
+        std::print(os, FMT1, diffuse_color);
+
+        for (Point p : vertices) {
+            std::println(os, "{} {} {}", p.x, p.y, p.z);
+        }
+
+        std::print(os, FMT2, diffuse_color);
+
+        for (auto [i, f] : faces | views::enumerate) {
+            std::print(os, "{},", f);
+            if (i % 50 == 0) std::print(os, "\n");
+        }
+
+        std::print(os, FMT3, diffuse_color);
+    }
+};
 
 /// @brief 点群に対しドロネーの三角形分割を実行し、IndexFacedSetとして出力
 /// @returns 三角形の面数
@@ -84,76 +125,101 @@ int write_delaunay_triangulation(std::ostream& os,
                                  const std::vector<Coord>& coords,
                                  const MapData& data,
                                  std::string_view diffuse_color) {
-    std::vector<double> coords_vec;
-    coords_vec.reserve(coords.size() * 2);
+    CDT::Triangulation<double> cdt;
 
-    // 1. 有効な座標（NaN以外）だけを集めた新しい配列を作る
-    std::vector<Coord> valid_coords;
-    for (Coord c : coords) {
-        if (!data.is_missing(c)) {
-            valid_coords.push_back(c);
+    auto valid_coords = coords
+        | views::filter([&](Coord c){ return !data.is_missing(c); });
+
+    cdt.insertVertices(valid_coords.begin(),
+                       valid_coords.end(),
+                       [&](Coord c){ return data.get_x(c); },
+                       [&](Coord c) { return data.get_z(c); });
+    cdt.eraseSuperTriangle();
+
+    IndexedFaceSet ifs = IndexedFaceSet(std::string(diffuse_color));
+    for (CDT::V2d<double> v : cdt.vertices) {
+        ifs.vertices.push_back(v2d_to_Point(v, data));
+    }
+
+    for (const auto& tri : cdt.triangles) {
+        ifs.faces.push_back(tri.vertices[2]);
+        ifs.faces.push_back(tri.vertices[1]);
+        ifs.faces.push_back(tri.vertices[0]);
+        ifs.faces.push_back(-1);
+    }
+
+    ifs.write_to(os);
+
+    return cdt.triangles.size();
+}
+
+/// 制限付きドロネー三角形分割を使って建物の上面をIndexedFaceSetに追加
+static void add_building_top(IndexedFaceSet& ifs,
+                             const MapData& data,
+                             const Building& building) {
+    auto valid_coords = building.coords
+        | views::filter([&](Coord c){ return !data.is_missing(c); });
+
+    std::map<Coord, std::size_t> outline_indices;
+    for (auto [i, c] : valid_coords | views::enumerate) {
+        if (data.type_at(c) != Type::BuildingOutline
+            || data.is_missing(c)) continue;
+        outline_indices.try_emplace(c, i);
+    }
+
+    CDT::Triangulation<double> cdt;
+    cdt.insertVertices(valid_coords.begin(),
+                       valid_coords.end(),
+                       [&](Coord c){ return data.get_x(c); },
+                       [&](Coord c){ return data.get_z(c); });
+
+    CDT::EdgeVec edges;
+    for (const auto& path : building.outline_paths) {
+        for (std::size_t n = path.size(), i = 0; i < n; ++i) {
+            const Coord c1 = path[i % n];
+            const Coord c2 = path[(i + 1) % n];
+                edges.emplace_back(
+                    outline_indices.at(c1),
+                    outline_indices.at(c2)
+                );
         }
     }
 
-    // 2. この関数内で coords を使っていた箇所をすべて valid_coords に変える
-    for (Coord c : valid_coords) {
-        Point p = data.point_at(c);
-        coords_vec.push_back(p.x);
-        coords_vec.push_back(p.z);
+    cdt.insertEdges(edges);
+    cdt.eraseOuterTrianglesAndHoles();
+
+    const std::size_t offset = ifs.vertices.size();
+
+    for (CDT::V2d<double> v : cdt.vertices) {
+        ifs.vertices.push_back(v2d_to_Point(v, data));
     }
 
-    if (coords.size() < 2) {
-        throw std::logic_error("write_delaunay_triangulation(): coordは最低2以上必要");
+    for (const auto& tri : cdt.triangles) {
+        ifs.faces.push_back(tri.vertices[2] + offset);
+        ifs.faces.push_back(tri.vertices[1] + offset);
+        ifs.faces.push_back(tri.vertices[0] + offset);
+        ifs.faces.push_back(-1);
     }
-
-    delaunator::Delaunator d(coords_vec);
-
-    std::print(os, INDEXEDFACESET_FMT1, diffuse_color);
-
-    for (Coord c : coords) {
-        Point p = data.point_at(c);
-        std::println(os, "{} {} {},", p.x, p.y, p.z);
-    }
-
-    std::print(os, INDEXEDFACESET_FMT2);
-
-    for (std::size_t i = 0; i < d.triangles.size(); i += 3) {
-        std::println(os,
-                     "{}, {}, {}, -1",
-                     d.triangles.at(i),
-                     d.triangles.at(i + 1),
-                     d.triangles.at(i + 2));
-    }
-
-    std::print(os, INDEXEDFACESET_FMT3);
-    return d.triangles.size() / 3;
-
 }
 
-/// @brief 建物をIndexFacedSetとして出力
-///
-/// @returns 面数
-static int write_building(std::ostream& os,
-                    const MapData& data,
-                    const Building& building,
-                    std::string_view diffuse_color) {
-    auto is_building = [&](Coord c) {
+/// 建物の壁をIndexedFaceSetに追加
+static void add_building_wall(IndexedFaceSet& ifs,
+                              const MapData& data,
+                              const Building& building) {
+    auto is_building_type = [&](Coord c) {
         return data.contains(c)
             && (data.type_at(c) == Type::Building 
             || data.type_at(c) == Type::BuildingOutline);
     };
 
-    std::vector<Point> vertices;
-    std::vector<std::array<int, 4>> faces; 
-
-    // 壁
     for (const auto& outline : building.outline_paths) {
         for (Coord c : outline) {
-            const int base = vertices.size();
+            const int base = ifs.vertices.size();
 
             auto add_face = [&](std::array<int, 4> indices) {
                 for (int& i : indices) i += base;
-                faces.push_back(indices);
+                ifs.faces.append_range(indices);
+                ifs.faces.push_back(-1);
             };
 
             auto [x, y, z] = data.point_at(c);
@@ -170,48 +236,18 @@ static int write_building(std::ostream& os,
                 {x - 0.5, y, z + 0.5},
             }};
 
-            vertices.append_range(coord_vertices);
+            ifs.vertices.append_range(coord_vertices);
 
-            if (!is_building(c + Coord{-1, 0})) 
+            if (!is_building_type(c + Coord{-1, 0})) 
                 add_face({0, 4, 5, 1});
-            if (!is_building(c + Coord{0, 1})) 
+            if (!is_building_type(c + Coord{0, 1})) 
                 add_face({1, 5, 6, 2});
-            if (!is_building(c + Coord{1, 0})) 
+            if (!is_building_type(c + Coord{1, 0})) 
                 add_face({2, 6, 7, 3});
-            if (!is_building(c + Coord{0, -1})) 
+            if (!is_building_type(c + Coord{0, -1})) 
                 add_face({3, 7, 4, 0});
         }
     }
-
-    std::print(os, INDEXEDFACESET_FMT1, diffuse_color);
-
-    for (auto p : vertices) 
-        std::println(os, "{} {} {},", p.x, p.y, p.z);
-
-    std::print(os, INDEXEDFACESET_FMT2);
-
-    for (auto face : faces) 
-        std::println(os, "{}, {}, {}, {} -1", face[0], face[1], face[2], face[3]);
-
-    std::print(os, INDEXEDFACESET_FMT3);
-
-    // 屋上
-    if (building.coords.size() >= 2) {
-        try {
-            write_delaunay_triangulation(
-                os,
-                building.coords 
-                    | std::views::filter([&](Coord c){ return !data.is_missing(c);})
-                    | std::ranges::to<std::vector>(),
-                data,
-                diffuse_color
-            );
-        } catch (std::exception& e) {
-
-        }
-    }
-
-    return faces.size();
 }
 
 struct RGB {
@@ -303,17 +339,27 @@ Inline {{
     } else {
         write_delaunay_triangulation(out_ground, ground_coords, data, "0.25 0.5 1");
     }
+    std::println("地面出力完了");
+
     std::print(out_building, VRML_HEADER);
 
     if (colorful_buildings) {
         for (const auto& [i, building] 
             : data.buildings | std::views::enumerate) {
-            write_building(out_building, data, building, building_color(i));
+            IndexedFaceSet building_ifs = IndexedFaceSet(building_color(i));
+            add_building_wall(building_ifs, data, building);
+            add_building_top(building_ifs, data, building);
+            building_ifs.write_to(out_building);
         }
     } else {
+        IndexedFaceSet building_ifs = IndexedFaceSet("1 0.5 0.25");
         for (const auto& building : data.buildings) {
-            write_building(out_building, data, building, "1 0.5 0.25");
+            add_building_wall(building_ifs, data, building);
+            add_building_top(building_ifs, data, building);
         }
+        building_ifs.write_to(out_building);
     }
+
+    std::println("建物出力完了");
 
 }

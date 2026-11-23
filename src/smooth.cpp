@@ -4,7 +4,7 @@
 #include <print>
 
 #include "genk.hpp"
-#include "third_party/decoterm.hpp"
+#include <third_party/decoterm.hpp>
 
 /// @brief 1ブロック内の間引き処理（このファイル内でのみ使用するため static）
 ///
@@ -130,7 +130,9 @@ void smooth_buildings(MapData& data) {
                 data,
                 block_size,
                 threshold,
-                [&](Coord c){ return building.coords.contains(c) && data.type_at(c) == Type::Building; },
+                [&](Coord c){ 
+                    return building.coords.contains(c) && data.type_at(c) == Type::Building;
+                },
                 building.top_left,
                 building.bottom_right
             );

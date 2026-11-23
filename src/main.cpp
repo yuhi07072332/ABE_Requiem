@@ -6,7 +6,7 @@
 #include <print>
 #include <string>
 
-#include "third_party/decoterm.hpp"
+#include <third_party/decoterm.hpp>
 
 #include "cli.hpp"
 #include "genk.hpp"
@@ -15,7 +15,6 @@ constexpr deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
 
 /// 全てのアルゴリズムを実行
 void exec_all(MapData& data) {
-
     std::println("{}", "分類" | hl);
     classify_map(data);
 
@@ -30,8 +29,6 @@ void exec_all(MapData& data) {
 
     std::println("{}", "建物平滑化" | hl);
     smooth_buildings(data);
-
-
 }
 
 // ┌                                                         ┐

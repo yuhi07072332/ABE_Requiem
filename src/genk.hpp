@@ -25,6 +25,7 @@ struct Coord {
     Coord operator-(Coord other) const { return {i - other.i, j - other.j}; }
 };
 
+/// 建物
 struct Building {
     std::set<Coord> coords;
     std::vector<std::vector<Coord>> outline_paths;
@@ -74,16 +75,6 @@ struct MapData {
     double& at(int i, int j) { return grid.at(i * cols + j); }
     double& at(Coord c) { return grid.at(c.i * cols + c.j); }
 
-    /// i行j列に対応するPointを取得
-    Point point_at(int i, int j) const {
-        return Point {
-            static_cast<double>(x) + j,
-            at(i, j),
-            static_cast<double>(z) + i
-        };
-    }
-    Point point_at(Coord c) const { return point_at(c.i, c.j); }
-
     /// i行j列のTypeを取得
     const Type& type_at(int i, int j) const { return types.at(i * cols + j); }
     const Type& type_at(Coord c) const { return types.at(c.i * cols + c.j); }
@@ -99,6 +90,21 @@ struct MapData {
         return i >= 0 && i < rows && j >= 0 && j < cols;
     }
     bool contains(Coord c) const { return contains(c.i, c.j); }
+
+    /*_____ 座標系変換 _____*/
+    
+    /// i行j列に対応するPointを取得
+    Point point_at(int i, int j) const {
+        return Point {
+            static_cast<double>(x) + j,
+            at(i, j),
+            static_cast<double>(z) + i
+        };
+    }
+    Point point_at(Coord c) const { return point_at(c.i, c.j); }
+
+    int get_x(Coord c) const { return x + c.j; }
+    int get_z(Coord c) const { return z + c.i; }
 };
 
 /* ----- utility ----- */

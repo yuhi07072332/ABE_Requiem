@@ -9,8 +9,8 @@
 #include <fstream>
 #include <ios>
 
-#include "third_party/decoterm.hpp"
-#include "third_party/argparse.hpp"
+#include <third_party/decoterm.hpp>
+#include <third_party/argparse.hpp>
 
 #include "cli.hpp"
 

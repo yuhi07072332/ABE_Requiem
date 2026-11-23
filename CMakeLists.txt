@@ -20,6 +20,10 @@ target_compile_options(genk PRIVATE
     -Wno-unused-but-set-variable 
 )
 
+target_include_directories(genk PRIVATE 
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
 if(WIN32)
     target_link_libraries(genk PRIVATE stdc++exp)
 endif()

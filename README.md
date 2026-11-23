@@ -9,10 +9,10 @@
 
 ```text
 src/  ← ソースコード
-└── third_party/  ← 外部ライブラリ
-    ├── argparse.hpp　← コマンドライン解析
-    ├── decoterm.hpp  ← 自作カラー出力ライブラリ(ドヤ)
-    └── delaunator/　 ← ドロネー三角形分割
+third_party/  ← 外部ライブラリ
+   ├── argparse.hpp　← コマンドライン解析
+   ├── decoterm.hpp  ← 自作カラー出力ライブラリ(ドヤ)
+   └── CDT/　        ← (制約付き)ドロネー三角形分割
 
 ```
 
