@@ -1,15 +1,21 @@
-#include <exception>
+#include <cassert>
+#include <map>
 #include <ostream>
+#include <stdexcept>
 #include <string_view>
 #include <print>
 #include <vector>
 #include <cstddef>
 #include <ranges>
 #include <array>
+#include <format>
 
-#include <third_party/delaunator/delaunator.hpp>
+#include <third_party/CDT/CDT.hpp>
 
 #include "genk.hpp"
+#include "formatter.hpp"
+
+namespace views = std::views;
 
 /// 点群をElevationGridで出力
 void write_elevation_grid(std::ostream& os, const MapData& data) {
@@ -78,56 +84,107 @@ constexpr std::string_view INDEXEDFACESET_FMT3 = R"(
 }}
 )";
 
+static Point v2d_to_Point(CDT::V2d<double> v, const MapData& data) {
+    return Point {
+        .x = v.x,
+        .y = data.at(v.y - data.z, v.x - data.x),
+        .z = v.y
+    };
+}
+
 /// @brief 点群に対しドロネーの三角形分割を実行し、IndexFacedSetとして出力
 /// @returns 三角形の面数
 int write_delaunay_triangulation(std::ostream& os,
                                  const std::vector<Coord>& coords,
                                  const MapData& data,
                                  std::string_view diffuse_color) {
-    std::vector<double> coords_vec;
-    coords_vec.reserve(coords.size() * 2);
+    CDT::Triangulation<double> cdt;
 
-    // 1. 有効な座標（NaN以外）だけを集めた新しい配列を作る
-    std::vector<Coord> valid_coords;
-    for (Coord c : coords) {
-        if (!data.is_missing(c)) {
-            valid_coords.push_back(c);
-        }
-    }
+    auto valid_coords = coords
+        | views::filter([&](Coord c){ return !data.is_missing(c); });
 
-    // 2. この関数内で coords を使っていた箇所をすべて valid_coords に変える
-    for (Coord c : valid_coords) {
-        Point p = data.point_at(c);
-        coords_vec.push_back(p.x);
-        coords_vec.push_back(p.z);
-    }
-
-    if (coords.size() < 2) {
-        throw std::logic_error("write_delaunay_triangulation(): coordは最低2以上必要");
-    }
-
-    delaunator::Delaunator d(coords_vec);
+    cdt.insertVertices(valid_coords.begin(),
+                       valid_coords.end(),
+                       [&](Coord c){ return data.get_x(c); },
+                       [&](Coord c) { return data.get_z(c); });
+    cdt.eraseSuperTriangle();
 
     std::print(os, INDEXEDFACESET_FMT1, diffuse_color);
 
-    for (Coord c : coords) {
-        Point p = data.point_at(c);
+    for (CDT::V2d v : cdt.vertices) {
+        Point p = v2d_to_Point(v, data);
         std::println(os, "{} {} {},", p.x, p.y, p.z);
     }
 
     std::print(os, INDEXEDFACESET_FMT2);
 
-    for (std::size_t i = 0; i < d.triangles.size(); i += 3) {
+    for (const auto& tri : cdt.triangles) {
         std::println(os,
                      "{}, {}, {}, -1",
-                     d.triangles.at(i),
-                     d.triangles.at(i + 1),
-                     d.triangles.at(i + 2));
+                     tri.vertices[2],
+                     tri.vertices[1],
+                     tri.vertices[0]);
     }
 
     std::print(os, INDEXEDFACESET_FMT3);
-    return d.triangles.size() / 3;
+    return cdt.triangles.size();
+}
 
+static int write_building_top(std::ostream& os,
+                              const MapData& data,
+                              const Building& building,
+                              std::string_view diffuse_color) {
+    auto valid_coords = building.coords
+        | views::filter([&](Coord c){ return !data.is_missing(c); });
+
+    std::map<Coord, std::size_t> outline_indices;
+    for (auto [i, c] : building.coords | views::enumerate) {
+        if (data.type_at(c) != Type::BuildingOutline
+            || data.is_missing(c)) continue;
+        outline_indices.try_emplace(c, i);
+    }
+
+    CDT::Triangulation<double> cdt;
+    cdt.insertVertices(valid_coords.begin(),
+                       valid_coords.end(),
+                       [&](Coord c){ return data.get_x(c); },
+                       [&](Coord c){ return data.get_z(c); });
+
+    CDT::EdgeVec edges;
+    for (const auto& path : building.outline_paths) {
+        for (std::size_t n = path.size(), i = 0; i < n; ++i) {
+            const Coord c1 = path[i % n];
+            const Coord c2 = path[(i + 1) % n];
+            if (!building.coords.contains(c1) || !building.coords.contains(c2)) continue;
+                edges.emplace_back(
+                    outline_indices.at(c1),
+                    outline_indices.at(c2)
+                );
+        }
+    }
+
+    cdt.insertEdges(edges);
+    cdt.eraseOuterTrianglesAndHoles();
+
+    std::print(os, INDEXEDFACESET_FMT1, diffuse_color);
+
+    for (CDT::V2d<double> v : cdt.vertices) {
+        Point p = v2d_to_Point(v, data);
+        std::println(os, "{} {} {},", p.x, p.y, p.z);
+    }
+
+    std::print(os, INDEXEDFACESET_FMT2);
+
+    for (const auto& tri : cdt.triangles) {
+        std::println(os,
+                     "{}, {}, {}, -1",
+                     tri.vertices[2],
+                     tri.vertices[1],
+                     tri.vertices[0]);
+    }
+
+    std::print(os, INDEXEDFACESET_FMT3);
+    return cdt.triangles.size();
 }
 
 /// @brief 建物をIndexFacedSetとして出力
@@ -196,20 +253,7 @@ static int write_building(std::ostream& os,
     std::print(os, INDEXEDFACESET_FMT3);
 
     // 屋上
-    if (building.coords.size() >= 2) {
-        try {
-            write_delaunay_triangulation(
-                os,
-                building.coords 
-                    | std::views::filter([&](Coord c){ return !data.is_missing(c);})
-                    | std::ranges::to<std::vector>(),
-                data,
-                diffuse_color
-            );
-        } catch (std::exception& e) {
-
-        }
-    }
+    write_building_top(os, data, building, diffuse_color);
 
     return faces.size();
 }
