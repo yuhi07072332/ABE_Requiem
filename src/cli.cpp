@@ -81,9 +81,14 @@ Option parse_args(int argc, const char** argv) {
 
     parser.add_argument("command").store_into(selected_command);
 
-    parser.add_argument("file-path")
-        .default_value("")
-        .store_into(opt.input_file);
+    parser.add_argument("input_files")
+        .store_into(opt.input_files);
+
+    parser.add_argument("-d", "--directory")
+        .help("指定されたディレクトリのすべての*.datを読み込む")
+        .action([&](const std::string& dir){
+            opt.input_dir = dir;
+        });
 
     parser.add_argument("-o")
         .default_value("out.wrl")
@@ -125,6 +130,19 @@ Option parse_args(int argc, const char** argv) {
     }
 
     opt.output_file = std::move(output_filename);
+    if (opt.input_dir) {
+        if (!opt.input_files.empty()) {
+            print_error("ディレクトリを指定した場合は地図ファイルを指定していけません");
+            throw std::exception();
+        }
+
+        for (const auto& entry :
+             std::filesystem::directory_iterator(*opt.input_dir)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".dat") {
+                opt.input_files.push_back(entry.path().string());
+            }
+        }
+    }
 
     return opt;
 }
