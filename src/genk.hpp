@@ -133,8 +133,8 @@ void fill_missing(MapData& data);
 
 /* ----- smooth ------ */
 
-void smooth_ground(MapData& data);
-void smooth_buildings(MapData& data);
+void smooth_ground(MapData& data, int level);
+void smooth_buildings(MapData& data, int level);
 
 /* ----- vrml ----- */
 

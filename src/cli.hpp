@@ -14,6 +14,8 @@ struct Option {
     std::filesystem::path output_file;              // 出力ファイル
     bool append = false;                            // 出力する際にファイルを上書きするのではなく追加する
     
+    int smooth_ground = 16;
+    int smooth_building = 16;
     bool colorful_buildings = false;
 
     std::ofstream open_output_file() const;

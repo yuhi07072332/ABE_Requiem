@@ -101,6 +101,14 @@ Option parse_args(int argc, const char** argv) {
             }
         });
 
+    parser.add_argument("--smooth-ground")
+        .store_into(opt.smooth_ground)
+        .help("地面の平滑化の強度を指定[デフォルト=16]");
+
+    parser.add_argument("--smooth-building")
+        .store_into(opt.smooth_building)
+        .help("建物の平滑化の強度を指定[デフォルト=16]");
+
     parser.add_argument("-a", "--append")
         .flag()
         .help("出力する際にファイルを上書きするのではなく追加する")
