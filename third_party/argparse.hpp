@@ -1,3 +1,4 @@
+// !MODIFIED!
 /*
   __ _ _ __ __ _ _ __   __ _ _ __ ___  ___
  / _` | '__/ _` | '_ \ / _` | '__/ __|/ _ \ Argument Parser for Modern C++
@@ -2080,6 +2081,21 @@ public:
     std::stringstream out;
     out << *this;
     return out;
+  }
+
+  // Return the names and help text of every registered optional argument.
+  // Names that are aliases of the same argument are joined with ", ".
+  auto optional_arguments() const
+      -> std::vector<std::pair<std::string, std::string>> {
+    std::vector<std::pair<std::string, std::string>> arguments;
+    arguments.reserve(m_optional_arguments.size());
+    for (const auto &argument : m_optional_arguments) {
+      arguments.emplace_back(
+          details::join(argument.m_names.begin(), argument.m_names.end(),
+                        ", "),
+          argument.m_help);
+    }
+    return arguments;
   }
 
   // Sets the maximum width for a line of the Usage message
