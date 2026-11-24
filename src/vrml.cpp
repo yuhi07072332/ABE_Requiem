@@ -337,7 +337,7 @@ Inline {{
     if (colorful_buildings) {
         write_delaunay_triangulation(out_ground, ground_coords, data, "0.3 0.3 0.3");
     } else {
-        write_delaunay_triangulation(out_ground, ground_coords, data, "0.25 0.5 1");
+        write_delaunay_triangulation(out_ground, ground_coords, data, "0.35 0.43 0.67");
     }
     std::println("地面出力完了");
 
@@ -352,7 +352,7 @@ Inline {{
             building_ifs.write_to(out_building);
         }
     } else {
-        IndexedFaceSet building_ifs = IndexedFaceSet("1 0.5 0.25");
+        IndexedFaceSet building_ifs = IndexedFaceSet("0.96 0.47 0.38");
         for (const auto& building : data.buildings) {
             add_building_wall(building_ifs, data, building);
             add_building_top(building_ifs, data, building);
