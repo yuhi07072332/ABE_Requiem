@@ -14,7 +14,7 @@
 constexpr deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
 
 /// 全てのアルゴリズムを実行
-void exec_all(MapData& data) {
+void exec_all(MapData& data, const Option& opt) {
     std::println("{}", "分類" | hl);
     classify_map(data);
 
@@ -25,10 +25,10 @@ void exec_all(MapData& data) {
     process_building(data);
 
     std::println("{}", "地面平滑化" | hl);
-    smooth_ground(data);
+    smooth_ground(data, opt.smooth_ground);
 
     std::println("{}", "建物平滑化" | hl);
-    smooth_buildings(data);
+    smooth_buildings(data, opt.smooth_building);
 }
 
 // ┌                                                         ┐
@@ -36,19 +36,19 @@ void exec_all(MapData& data) {
 // └                                                         ┘
 // NOTE: 
 // * コマンド関数は`void()`または`void(const Option& opt)`の形であること
-// * 基本的な流れとして、`read_map(opt.input_file)`でMapDataを読み込み、
+// * 基本的な流れとして、`read_map(opt.input_files)`でMapDataを読み込み、
 //   `opt.open_output_file()`で出力ファイルへの`std::ofstream`を受け取る
 
 void report_heights(const Option& opt) {
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     auto freq = calc_frequency(data.grid);
-    std::println("ファイル: {}", opt.input_file);
+    std::println("ファイル: {}", opt.input_files);
     for (auto [lower, frequency] : freq)
         std::println("\"[{:>3}, {:>3}]\", {}", lower, lower + 5, frequency);
 }
 
 void gen_points(const Option& opt) {
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     std::ofstream ofs = opt.open_output_file();
     write_elevation_grid(ofs, data);
     std::println("{} に出力しました",
@@ -56,8 +56,8 @@ void gen_points(const Option& opt) {
 }
 
 void all(const Option& opt) {
-    MapData data = read_map(opt.input_file);
-    exec_all(data);
+    MapData data = read_map(opt.input_files);
+    exec_all(data, opt);
 
     std::println("{}", "VRML化" | hl);
     auto out = opt.open_output_file();
@@ -75,36 +75,42 @@ void all(const Option& opt) {
                 out_building_filename,
                 opt.colorful_buildings);
 
-    std::println("{}, {}, {}に出力しました",
+    std::println("{} {}, {}, {}に出力しました",
+                 "完了" | deco::fg(deco::bright_green) | deco::bold,
                  opt.output_file.string(),
                  out_ground_filename,
                  out_building_filename);
 }
 
+void dry_run(const Option& opt) {
+    MapData data = read_map(opt.input_files);
+    exec_all(data, opt);
+}
+
 void show_classify(const Option& opt) {
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     classify_map(data);
     show_mapdata_types(data);
 }
 
 void show_buildings(const Option& opt) {
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     classify_map(data);
     show_mapdata_buildings(data);
 }
 
 void show_heights(const Option& opt) {
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     show_mapdata_heights(data);
 }
 
 
 void inspect(const Option& opt) {
     // 入力ファイルが指定されていない場合はエラー
-    if (opt.input_file.empty())
+    if (opt.input_files.empty())
         throw std::runtime_error("inspect: input file is required");
 
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     
     // 元々欠損点だったかどうかを記録する配列
     std::vector<bool> originally_missing(data.rows * data.cols);
@@ -143,12 +149,12 @@ void inspect(const Option& opt) {
     // アルゴリズムを実行２
     std::println("{}", "地面平滑化" | hl);
     const unsigned int ground_before = data.ground_coords;
-    smooth_ground(data);
+    smooth_ground(data, opt.smooth_ground);
     const unsigned int ground_erased = ground_before - data.ground_coords;
 
     std::println("{}", "建物平滑化" | hl);
     const unsigned int building_before = data.building_coords;
-    smooth_buildings(data);
+    smooth_buildings(data, opt.smooth_building);
     const unsigned int building_erased = building_before - data.building_coords;
 
     std::ofstream ofs{temp_file, std::ios::app};
@@ -177,6 +183,7 @@ int main(int argc, const char** argv) {
     try {
         // コマンドを登録
         add_command("all", "すべてのアルゴリズムとVRML化を実行", all);
+        add_command("dry-run", "すべてのアルゴリズム実行(VRML化はしない)", dry_run);
 
         add_command("show-heights", "点群の高さを図示", show_heights);
         add_command("show-classify", "classifyの結果を図示", show_classify);

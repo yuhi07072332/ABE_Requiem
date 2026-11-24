@@ -90,11 +90,11 @@ unsigned int downsample_flat_points(MapData& data,
 }
 
 /// 地面の平滑化を行う
-void smooth_ground(MapData& data) {
+void smooth_ground(MapData& data, int level) {
     int before = data.ground_coords;
     int erased = 0;
 
-    for (int i = 1; i <= 16; i *= 2) {
+    for (int i = 1; i <= level; i *= 2) {
         const int block_size = 2 * i;
         const double threshold = 0.1 * i;
         erased += downsample_flat_points(
@@ -118,12 +118,12 @@ void smooth_ground(MapData& data) {
 }
 
 /// 建物の平滑化を行う
-void smooth_buildings(MapData& data) {
+void smooth_buildings(MapData& data, int level) {
     int before = data.building_coords;
     int erased = 0;
 
     for (const auto& building : data.buildings) {
-        for (int i = 1; i <= 16; i *= 2) {
+        for (int i = 1; i <= level; i *= 2) {
             const int block_size = 2 * i;
             const double threshold = 0.1 * i;
             erased += downsample_flat_points(

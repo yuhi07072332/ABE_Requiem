@@ -1,3 +1,4 @@
+// !MODIFIED!
 /*
   __ _ _ __ __ _ _ __   __ _ _ __ ___  ___
  / _` | '__/ _` | '_ \ / _` | '__/ __|/ _ \ Argument Parser for Modern C++
@@ -1635,6 +1636,12 @@ private:
 
 class ArgumentParser {
 public:
+  struct OptionalArgument {
+    std::string name;
+    std::string metavar;
+    std::string help;
+  };
+
   explicit ArgumentParser(std::string program_name = {},
                           std::string version = "1.0",
                           default_arguments add_args = default_arguments::all,
@@ -2080,6 +2087,26 @@ public:
     std::stringstream out;
     out << *this;
     return out;
+  }
+
+  // Return the name, accepted-value metavar, and help text of every
+  // registered optional argument.
+  auto optional_arguments() const -> std::vector<OptionalArgument> {
+    std::vector<OptionalArgument> arguments;
+    arguments.reserve(m_optional_arguments.size());
+    for (const auto &argument : m_optional_arguments) {
+      std::string metavar;
+      if (argument.m_num_args_range.get_max() > 0) {
+        metavar = !argument.m_metavar.empty() ? argument.m_metavar : "VAR";
+        if (argument.m_num_args_range.get_max() > 1) {
+          metavar += "...";
+        }
+      }
+      arguments.push_back({details::join(argument.m_names.begin(),
+                                         argument.m_names.end(), ", "),
+                           std::move(metavar), argument.m_help});
+    }
+    return arguments;
   }
 
   // Sets the maximum width for a line of the Usage message

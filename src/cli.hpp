@@ -6,12 +6,16 @@
 #include <filesystem>
 #include <utility>
 #include <string_view>
+#include <optional>
 
 struct Option {
-    std::string input_file;                         // 入力ファイル
+    std::vector<std::string> input_files;           // 入力ファイル
+    std::optional<std::string> input_dir;           // 入力ディレクトリ
     std::filesystem::path output_file;              // 出力ファイル
     bool append = false;                            // 出力する際にファイルを上書きするのではなく追加する
     
+    int smooth_ground = 16;
+    int smooth_building = 16;
     bool colorful_buildings = false;
 
     std::ofstream open_output_file() const;

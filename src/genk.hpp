@@ -133,8 +133,8 @@ void fill_missing(MapData& data);
 
 /* ----- smooth ------ */
 
-void smooth_ground(MapData& data);
-void smooth_buildings(MapData& data);
+void smooth_ground(MapData& data, int level);
+void smooth_buildings(MapData& data, int level);
 
 /* ----- vrml ----- */
 
@@ -155,7 +155,7 @@ void export_vrml(const MapData& data,
 
 /* ----- input ----- */
 
-MapData read_map(std::string_view data_path);
+MapData read_map(const std::vector<std::string>& files);
 
 /* ----- clあssいfAI ----- */
 
