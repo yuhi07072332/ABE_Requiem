@@ -82,7 +82,7 @@ Option parse_args(int argc, const char** argv) {
     parser.add_argument("command").store_into(selected_command);
 
     parser.add_argument("input_files")
-        .default_value<std::vector<std::string>>({})
+        .nargs(argparse::nargs_pattern::any)
         .store_into(opt.input_files);
 
     parser.add_argument("-d", "--directory")
