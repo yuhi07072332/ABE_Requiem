@@ -111,10 +111,10 @@ void smooth_ground(MapData& data, int level) {
 
     data.ground_coords = after;
 
-    std::println("地面平滑化: {} -> {} ({}%)",
-                 before,
-                 after,
-                 -(erased * 100 / before) | deco::fg(deco::bright_yellow));
+    // std::println("地面平滑化: {} -> {} ({}%)",
+    //              before,
+    //              after,
+    //              -(erased * 100 / before) | deco::fg(deco::bright_yellow));
 }
 
 /// 建物の平滑化を行う
@@ -143,8 +143,8 @@ void smooth_buildings(MapData& data, int level) {
 
     data.building_coords = after;
 
-    std::println("建物平滑化: {} -> {} ({}%)",
-                 before,
-                 after,
-                 -(erased * 100 / before) | deco::fg(deco::bright_yellow));
+    // std::println("建物平滑化: {} -> {} ({}%)",
+    //              before,
+    //              after,
+    //              -(erased * 100 / before) | deco::fg(deco::bright_yellow));
 }

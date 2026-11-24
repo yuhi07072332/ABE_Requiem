@@ -15,20 +15,57 @@ constexpr deco::Style hl = deco::bold | deco::fg(deco::bright_yellow);
 
 /// 全てのアルゴリズムを実行
 void exec_all(MapData& data, const Option& opt) {
-    std::println("{}", "分類" | hl);
+    std::println("{}", "分類..." | hl);
     classify_map(data);
 
-    std::println("{}", "欠損点補間" | hl);
+    std::println("{}", "欠損点補間..." | hl);
     fill_missing(data);
 
-    std::println("{}", "建物処理" | hl);
+    std::println("{}", "建物処理..." | hl);
     process_building(data);
 
-    std::println("{}", "地面平滑化" | hl);
+    const int ground_before = data.ground_coords;
+    const int building_before = data.building_coords + data.building_outline_coords;
+    const int before = ground_before + building_before;
+
+    std::println("{}", "地面平滑化..." | hl);
     smooth_ground(data, opt.smooth_ground);
 
-    std::println("{}", "建物平滑化" | hl);
+    std::println("{}", "建物平滑化..." | hl);
     smooth_buildings(data, opt.smooth_building);
+
+    const int ground_after = data.ground_coords;
+    const int building_after = data.building_coords + data.building_outline_coords;
+    const int after = ground_after + building_after;
+
+    const double ground_percent = 
+        static_cast<double>(ground_before - ground_after) * 100 / ground_before;
+    const double building_percent = 
+        static_cast<double>(building_before - building_after) * 100 / building_before;
+    const double percent = 
+        static_cast<double>(before - after) * 100 / before;
+
+    std::println("\n┌{0:─^16} 削減結果 {0:─^16}┐\n", "");
+
+    std::println("  * 地面: {0} -> {1} {3}削減率{2:5.2f}%{4}",
+                 ground_before,
+                 ground_after,
+                 ground_percent,
+                 hl,
+                 deco::reset);
+    std::println("  * 建物: {0} -> {1} {3}削減率{2:5.2f}%{4}",
+                 building_before,
+                 building_after,
+                 building_percent,
+                 hl,
+                 deco::reset);
+    std::println("  * 全体: {0} -> {1} {3}削減率{2:5.2f}%{4}",
+                 before,
+                 after,
+                 percent,
+                 hl,
+                 deco::reset);
+    std::println("\n└{0:─^42}┘\n", "");
 }
 
 // ┌                                                         ┐
@@ -153,9 +190,11 @@ void inspect(const Option& opt) {
     const unsigned int ground_erased = ground_before - data.ground_coords;
 
     std::println("{}", "建物平滑化" | hl);
-    const unsigned int building_before = data.building_coords;
+    const unsigned int building_before = data.building_coords 
+        + data.building_outline_coords;
     smooth_buildings(data, opt.smooth_building);
-    const unsigned int building_erased = building_before - data.building_coords;
+    const unsigned int building_erased = building_before 
+        - (data.building_coords + data.building_outline_coords);
 
     std::ofstream ofs{temp_file, std::ios::app};
     std::println(ofs,
