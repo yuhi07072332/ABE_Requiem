@@ -37,7 +37,8 @@ struct Command {
 
 static std::vector<Command> commands;
 static std::string selected_command;
-static std::vector<std::pair<std::string, std::string>> optional_arguments;
+static std::vector<argparse::ArgumentParser::OptionalArgument>
+    optional_arguments;
 
 static void print_help() {
     const deco::Style placeholder = deco::fg(deco::bright_yellow);
@@ -62,8 +63,14 @@ static void print_help() {
     std::println("");
 
     std::println("{}", "オプション\n" | title);
-    for (const auto& [name, help] : optional_arguments)
-        std::println("{:30}  {}", name | highlight, help);
+    for (const auto& [name, metavar, help] : optional_arguments) {
+        std::string arg = std::format("{} {}",
+                                      name | highlight,
+                                      (metavar.empty() ? "" : metavar + " ") | placeholder);
+
+        std::println("{:<50}  {}", arg, help);
+    }
+        
 }
 
 static void print_error(std::string_view msg) {
@@ -86,6 +93,7 @@ Option parse_args(int argc, const char** argv) {
         .store_into(opt.input_files);
 
     parser.add_argument("-d", "--directory")
+        .metavar("<DIRECTORY>")
         .help("指定されたディレクトリのすべての*.datを読み込む")
         .action([&](const std::string& dir){
             opt.input_dir = dir;
@@ -93,6 +101,7 @@ Option parse_args(int argc, const char** argv) {
 
     parser.add_argument("-o")
         .default_value("out.wrl")
+        .metavar("<FILENAME>")
         .store_into(output_filename)
         .help("出力ファイル名を指定(デフォルト: out.wrl)")
         .action([&](const std::string& filename) {
@@ -103,10 +112,12 @@ Option parse_args(int argc, const char** argv) {
 
     parser.add_argument("--smooth-ground")
         .store_into(opt.smooth_ground)
+        .metavar("<N>")
         .help("地面の平滑化の強度を指定[デフォルト=16]");
 
     parser.add_argument("--smooth-building")
         .store_into(opt.smooth_building)
+        .metavar("<N>")
         .help("建物の平滑化の強度を指定[デフォルト=16]");
 
     parser.add_argument("-a", "--append")

@@ -1636,6 +1636,12 @@ private:
 
 class ArgumentParser {
 public:
+  struct OptionalArgument {
+    std::string name;
+    std::string metavar;
+    std::string help;
+  };
+
   explicit ArgumentParser(std::string program_name = {},
                           std::string version = "1.0",
                           default_arguments add_args = default_arguments::all,
@@ -2083,17 +2089,22 @@ public:
     return out;
   }
 
-  // Return the names and help text of every registered optional argument.
-  // Names that are aliases of the same argument are joined with ", ".
-  auto optional_arguments() const
-      -> std::vector<std::pair<std::string, std::string>> {
-    std::vector<std::pair<std::string, std::string>> arguments;
+  // Return the name, accepted-value metavar, and help text of every
+  // registered optional argument.
+  auto optional_arguments() const -> std::vector<OptionalArgument> {
+    std::vector<OptionalArgument> arguments;
     arguments.reserve(m_optional_arguments.size());
     for (const auto &argument : m_optional_arguments) {
-      arguments.emplace_back(
-          details::join(argument.m_names.begin(), argument.m_names.end(),
-                        ", "),
-          argument.m_help);
+      std::string metavar;
+      if (argument.m_num_args_range.get_max() > 0) {
+        metavar = !argument.m_metavar.empty() ? argument.m_metavar : "VAR";
+        if (argument.m_num_args_range.get_max() > 1) {
+          metavar += "...";
+        }
+      }
+      arguments.push_back({details::join(argument.m_names.begin(),
+                                         argument.m_names.end(), ", "),
+                           std::move(metavar), argument.m_help});
     }
     return arguments;
   }
