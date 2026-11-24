@@ -4,6 +4,7 @@
 #include <limits>
 #include <print>
 #include <queue>
+#include <set>
 #include <vector>
 #include <array>
 
@@ -66,7 +67,7 @@ enum State : std::uint8_t{
     Decided = 2,
 };
 
-/// @brief UnknownからBFSでGroundを拡張し, BuildingOutlineとOtherを仮判定
+/// @brief UnknownからBFSでGroundを拡張し, BuildingとOtherを仮判定
 static void bfs_ground(MapData& data,
                             std::vector<std::vector<State>>& state) {
     std::queue<Coord> queue;
@@ -132,7 +133,119 @@ static void bfs_ground(MapData& data,
     }
 }
 
-/// @brief 仮判定されたBuildingからBFSで建物を拡張
+/// @brief Buildingに囲まれたUnknown成分のうち、周辺地面とほぼ同じ高さのものをGroundにする
+///
+/// Unknown成分に接するBuilding連結成分の外側にあるGroundの中央値を
+/// 基準にする。これにより、建物に囲まれて通常のbfs_ground()では
+/// 到達できない中庭などをGroundとして扱える。
+static void classify_enclosed_ground(
+    MapData& data,
+    std::vector<std::vector<State>>& state) {
+    std::vector<std::vector<bool>> visited(
+        data.rows,
+        std::vector<bool>(data.cols, false)
+    );
+
+    auto median = [](std::vector<double> values) {
+        const auto middle = values.begin() + values.size() / 2;
+        std::ranges::nth_element(values, middle);
+        return *middle;
+    };
+
+    for (int i = 0; i < data.rows; ++i) {
+        for (int j = 0; j < data.cols; ++j) {
+            const Coord start{i, j};
+            if (visited[i][j] || data.type_at(start) != Type::Unknown) continue;
+
+            // 1. Unknownを探索し格納
+            std::vector<Coord> unknowns;
+            std::set<Coord> adjacent_buildings; // Unknownと隣接しているBuilding
+            std::queue<Coord> unknown_queue;
+            unknown_queue.push(start);
+            visited[i][j] = true;
+
+            while (!unknown_queue.empty()) {
+                const Coord c = unknown_queue.front();
+                unknown_queue.pop();
+                unknowns.push_back(c);
+
+                for (Coord dc : n4_dirs) {
+                    const Coord nc = c + dc;
+                    if (!data.contains(nc)) continue;
+
+                    if (data.type_at(nc) == Type::Building) {
+                        adjacent_buildings.insert(nc);
+                    }
+
+                    if (visited[nc.i][nc.j]
+                        || data.type_at(nc) != Type::Unknown) {
+                        continue;
+                    }
+                    visited[nc.i][nc.j] = true;
+                    unknown_queue.push(nc);
+                }
+            }
+
+            // Buildingに囲まれていないUnknownはbfs_building()で処理する
+            if (adjacent_buildings.empty()) continue;
+
+            // 2. Unknownと隣接しているBuildingを探索し、8近傍のGroundの高さを記録
+            std::set<Coord> buildings;
+            std::queue<Coord> building_queue;
+            for (Coord c : adjacent_buildings) {
+                if (buildings.insert(c).second) building_queue.push(c);
+            }
+
+            std::vector<double> surrounding_ground_heights; // Buildingの8近傍のGroundの高さ
+            while (!building_queue.empty()) {
+                const Coord c = building_queue.front();
+                building_queue.pop();
+
+                for (Coord dc : n8_dirs) {
+                    const Coord nc = c + dc;
+                    if (!data.contains(nc)) continue;
+
+                    if (data.type_at(nc) == Type::Ground) {
+                        surrounding_ground_heights.push_back(data.at(nc));
+                    }
+                }
+
+                for (Coord dc : n4_dirs) {
+                    const Coord nc = c + dc;
+                    if (!data.contains(nc)) continue;
+                    if (data.type_at(nc) == Type::Building
+                        && buildings.insert(nc).second) {
+                        building_queue.push(nc);
+                    }
+                }
+            }
+
+            if (surrounding_ground_heights.empty()) continue;
+
+            // 3. 格納されたUnknownとGroundの高さの差を比較し、GROUND_HEIGHT_DIFF_MAX
+            // 未満の場合はGroundに判定
+            std::vector<double> unknown_heights;
+            unknown_heights.reserve(unknowns.size());
+            for (Coord c : unknowns) {
+                unknown_heights.push_back(data.at(c));
+            }
+
+            const double ground_height = median(surrounding_ground_heights);
+            const double unknown_height = median(unknown_heights);
+            if (std::abs(unknown_height - ground_height)
+                >= GROUND_HEIGHT_DIFF_MAX) {
+                continue;
+            }
+
+            for (Coord c : unknowns) {
+                data.type_at(c) = Type::Ground;
+                state[c.i][c.j] = State::Decided;
+            }
+        }
+    }
+}
+
+/// @brief BuildingからBFSで建物を拡張
 ///
 /// @returns buildings
 static std::vector<Building> bfs_building(MapData& data,
@@ -158,6 +271,8 @@ static std::vector<Building> bfs_building(MapData& data,
                 if (data.type_at(nc) != Type::Building
                     && data.type_at(nc) != Type::Unknown) continue;
 
+                
+
                 data.type_at(nc) = Type::Building;
                 state[nc.i][nc.j] = State::Decided;
                 building.append(nc);
@@ -176,6 +291,7 @@ static std::vector<Building> bfs_building(MapData& data,
             if (data.type_at(i, j) != Type::Building) continue;
 
             Building building = bfs_from(Coord {i, j});
+            // buildingが1点のみの場合はOtherへ変換する
             if (building.coords.size() > 1) 
                 buildings.push_back(std::move(building));
             else
@@ -320,6 +436,8 @@ void classify_map(MapData& data) {
         }
     }
 
+    bfs_ground(data, state);
+    classify_enclosed_ground(data, state);
     bfs_ground(data, state);
     auto buildings = bfs_building(data, state);
 
