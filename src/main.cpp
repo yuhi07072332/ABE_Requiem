@@ -36,19 +36,19 @@ void exec_all(MapData& data) {
 // └                                                         ┘
 // NOTE: 
 // * コマンド関数は`void()`または`void(const Option& opt)`の形であること
-// * 基本的な流れとして、`read_map(opt.input_file)`でMapDataを読み込み、
+// * 基本的な流れとして、`read_map(opt.input_files)`でMapDataを読み込み、
 //   `opt.open_output_file()`で出力ファイルへの`std::ofstream`を受け取る
 
 void report_heights(const Option& opt) {
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     auto freq = calc_frequency(data.grid);
-    std::println("ファイル: {}", opt.input_file);
+    std::println("ファイル: {}", opt.input_files);
     for (auto [lower, frequency] : freq)
         std::println("\"[{:>3}, {:>3}]\", {}", lower, lower + 5, frequency);
 }
 
 void gen_points(const Option& opt) {
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     std::ofstream ofs = opt.open_output_file();
     write_elevation_grid(ofs, data);
     std::println("{} に出力しました",
@@ -56,7 +56,7 @@ void gen_points(const Option& opt) {
 }
 
 void all(const Option& opt) {
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     exec_all(data);
 
     std::println("{}", "VRML化" | hl);
@@ -75,36 +75,37 @@ void all(const Option& opt) {
                 out_building_filename,
                 opt.colorful_buildings);
 
-    std::println("{}, {}, {}に出力しました",
+    std::println("{} {}, {}, {}に出力しました",
+                 "完了" | deco::fg(deco::bright_green) | deco::bold,
                  opt.output_file.string(),
                  out_ground_filename,
                  out_building_filename);
 }
 
 void show_classify(const Option& opt) {
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     classify_map(data);
     show_mapdata_types(data);
 }
 
 void show_buildings(const Option& opt) {
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     classify_map(data);
     show_mapdata_buildings(data);
 }
 
 void show_heights(const Option& opt) {
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     show_mapdata_heights(data);
 }
 
 
 void inspect(const Option& opt) {
     // 入力ファイルが指定されていない場合はエラー
-    if (opt.input_file.empty())
+    if (opt.input_files.empty())
         throw std::runtime_error("inspect: input file is required");
 
-    MapData data = read_map(opt.input_file);
+    MapData data = read_map(opt.input_files);
     
     // 元々欠損点だったかどうかを記録する配列
     std::vector<bool> originally_missing(data.rows * data.cols);

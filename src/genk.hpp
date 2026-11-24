@@ -155,7 +155,7 @@ void export_vrml(const MapData& data,
 
 /* ----- input ----- */
 
-MapData read_map(std::string_view data_path);
+MapData read_map(const std::vector<std::string>& files);
 
 /* ----- clあssいfAI ----- */
 

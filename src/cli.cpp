@@ -58,12 +58,12 @@ static void print_help() {
 
     std::println("{}", "コマンド\n" | title);
     for (const auto& [name, desc, _] : commands)
-        std::println("{:8}\t\t{}", name | highlight, desc);
+        std::println("{:30}  {}", name | highlight, desc);
     std::println("");
 
     std::println("{}", "オプション\n" | title);
     for (const auto& [name, help] : optional_arguments)
-        std::println("{:25}  {}", name | highlight, help);
+        std::println("{:30}  {}", name | highlight, help);
 }
 
 static void print_error(std::string_view msg) {
@@ -82,6 +82,7 @@ Option parse_args(int argc, const char** argv) {
     parser.add_argument("command").store_into(selected_command);
 
     parser.add_argument("input_files")
+        .default_value<std::vector<std::string>>({})
         .store_into(opt.input_files);
 
     parser.add_argument("-d", "--directory")
@@ -133,13 +134,16 @@ Option parse_args(int argc, const char** argv) {
     if (opt.input_dir) {
         if (!opt.input_files.empty()) {
             print_error("ディレクトリを指定した場合は地図ファイルを指定していけません");
+            print_help();
             throw std::exception();
         }
 
+        std::println("ファイル読み込み:");
         for (const auto& entry :
              std::filesystem::directory_iterator(*opt.input_dir)) {
             if (entry.is_regular_file() && entry.path().extension() == ".dat") {
                 opt.input_files.push_back(entry.path().string());
+                std::println("{}", entry.path().string());
             }
         }
     }
