@@ -132,8 +132,8 @@ void fill_missing(MapData& data);
 
 /* ----- smooth ------ */
 
-void smooth_ground(MapData& data, int level);
-void smooth_buildings(MapData& data, int level);
+void smooth_ground(MapData& data, int max_block, double init_threshold);
+void smooth_buildings(MapData& data, int max_block, double init_threshold);
 
 /* ----- vrml ----- */
 

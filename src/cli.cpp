@@ -111,14 +111,24 @@ Option parse_args(int argc, const char** argv) {
         });
 
     parser.add_argument("--smooth-ground")
-        .store_into(opt.smooth_ground)
+        .store_into(opt.smooth_ground_threshold)
         .metavar("<N>")
-        .help("地面の平滑化の強度を指定[デフォルト=16]");
+        .help("地面の平滑化の強度を指定[デフォルト=0.1]");
+
+    parser.add_argument("--smooth-ground-block")
+        .store_into(opt.smooth_ground_block)
+        .metavar("<N>")
+        .help("地面の平滑化の最大ブロックサイズを指定[デフォルト=64]");
 
     parser.add_argument("--smooth-building")
-        .store_into(opt.smooth_building)
+        .store_into(opt.smooth_building_threshold)
         .metavar("<N>")
-        .help("建物上面の平滑化の強度を指定[デフォルト=16]");
+        .help("建物上面の平滑化の強度を指定[デフォルト=0.1]");
+
+    parser.add_argument("--smooth-building-block")
+        .store_into(opt.smooth_ground_block)
+        .metavar("<N>")
+        .help("建物上面の平滑化の最大ブロックサイズを指定[デフォルト=16]");
 
     parser.add_argument("--smooth-outline")
         .store_into(opt.smooth_outline)

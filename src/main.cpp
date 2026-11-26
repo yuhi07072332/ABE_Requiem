@@ -29,10 +29,10 @@ void exec_all(MapData& data, const Option& opt) {
     const int before = ground_before + building_before;
 
     std::println("{}", "地面平滑化..." | hl);
-    smooth_ground(data, opt.smooth_ground);
+    smooth_ground(data, opt.smooth_ground_block, opt.smooth_ground_threshold);
 
     std::println("{}", "建物平滑化..." | hl);
-    smooth_buildings(data, opt.smooth_building);
+    smooth_buildings(data, opt.smooth_ground_block, opt.smooth_building_threshold);
 
     const int ground_after = data.ground_coords;
     const int building_after = data.building_coords + data.building_outline_coords;
@@ -164,8 +164,6 @@ void inspect(const Option& opt) {
     std::println("{}", "欠損点補間" | hl);
     fill_missing(data);
 
-    std::println("{}", "建物処理" | hl);
-    process_buildings(data, opt.smooth_outline);
 
     // 一時ファイルにデータを保存
     constexpr const char* temp_file = "inspector_temp.dat";
@@ -184,15 +182,17 @@ void inspect(const Option& opt) {
     }
     
     // アルゴリズムを実行２
+    std::println("{}", "建物処理" | hl);
+    process_buildings(data, opt.smooth_outline);
     std::println("{}", "地面平滑化" | hl);
     const unsigned int ground_before = data.ground_coords;
-    smooth_ground(data, opt.smooth_ground);
+    smooth_ground(data, opt.smooth_ground_block, opt.smooth_ground_threshold);
     const unsigned int ground_erased = ground_before - data.ground_coords;
 
     std::println("{}", "建物平滑化" | hl);
     const unsigned int building_before = data.building_coords 
         + data.building_outline_coords;
-    smooth_buildings(data, opt.smooth_building);
+    smooth_buildings(data, opt.smooth_ground_block, opt.smooth_building_threshold);
     const unsigned int building_erased = building_before 
         - (data.building_coords + data.building_outline_coords);
 
