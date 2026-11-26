@@ -51,6 +51,9 @@ def load_points(path):
             if not parts:
                 continue
 
+            if parts[0] == "REDUCED_MAP":
+                break
+
             if parts[0] == "SMOOTHING":
                 if len(parts) != 5:
                     raise ValueError(f"{path}: SMOOTHING行が不正です")
@@ -89,9 +92,52 @@ def load_points(path):
         )
 
 
+def load_reduced_points(path):
+    with open(path, encoding="utf-8-sig") as source:
+        for line in source:
+            parts = line.split()
+            if parts[:2] == ["REDUCED_MAP", "1"]:
+                break
+        else:
+            return None
+
+        header = source.readline().split()
+        if len(header) < 4:
+            raise ValueError(f"{path}: 削減後MAPDATAヘッダーが不正です")
+
+        rows, cols, _origin_x, _origin_z = map(int, header[:4])
+        data_rows = []
+        for line in source:
+            parts = line.split()
+            if not parts:
+                continue
+            if len(parts) not in (2, 3):
+                raise ValueError(f"{path}: 削減後MAPDATAの列数が不正です")
+            data_rows.append([float(value) for value in parts])
+
+        if len(data_rows) != rows * cols:
+            raise ValueError(f"{path}: 削減後データ件数が不正です")
+
+        values = np.asarray(data_rows, dtype=float)
+        heights = values[:, 0].reshape(rows, cols)
+        types = values[:, 1].astype(np.uint8).reshape(rows, cols)
+        missing = (
+            values[:, 2].astype(bool).reshape(rows, cols)
+            if values.shape[1] == 3
+            else ~np.isfinite(heights)
+        )
+        return heights, types, missing
+
+
 # 分類画像の生成
 def classification_image(types):
     return TYPE_COLORS[np.clip(types, 0, len(TYPE_COLORS) - 1)]
+
+
+def reduced_classification_image(types, heights):
+    image = classification_image(types).copy()
+    image[~np.isfinite(heights)] = [80, 80, 80]
+    return image
 
 
 
@@ -149,6 +195,12 @@ def main():
         heights, origin_x, origin_z, types, missing_mask,
         ground_before, ground_erased, building_before, building_erased
     ) = load_points(input_path)
+    reduced_data = load_reduced_points(input_path)
+    if reduced_data is None:
+        reduced_heights = None
+        reduced_types = None
+    else:
+        reduced_heights, reduced_types, _reduced_missing = reduced_data
 
     source_name = "MapData"
 
@@ -156,7 +208,7 @@ def main():
     window = QMainWindow()
 
     # ウィンドウタイトルの設定
-    window.setWindowTitle("Omnispect 1.2 Requiem")
+    window.setWindowTitle("Omnispect 2.1 Requiem")
     central = QWidget()
     layout = QHBoxLayout(central)
     window.setCentralWidget(central)
@@ -164,13 +216,20 @@ def main():
     # 左側のレイアウトと出力切り替え用のコンボボックス
     left = QVBoxLayout()
     output_selector = QComboBox()
-    output_selector.addItems(["分類", "標高", "欠損点表示", "ヒストグラム"])
+    output_selector.addItems([
+        "分類（削減前）",
+        "分類（削減後）",
+        "標高（削減前）",
+        "標高（削減後）",
+        "欠損点表示",
+        "ヒストグラム",
+    ])
     left.addWidget(output_selector)
     stack = QStackedWidget()
     left.addWidget(stack, 1)
     layout.addLayout(left, 1)
 
-    # 分類ビュー
+    # 分類ビュー（削減前）
     graphics = pg.GraphicsLayoutWidget()
     view = graphics.addViewBox()
     view.setAspectLocked(True)
@@ -180,6 +239,28 @@ def main():
     view.addItem(image)
     view.autoRange()
     stack.addWidget(graphics)
+
+    # 分類ビュー（削減後）
+    reduced_graphics = pg.GraphicsLayoutWidget()
+    reduced_view = reduced_graphics.addViewBox()
+    reduced_view.setAspectLocked(True)
+    reduced_view.invertY(True)
+    reduced_view.setMouseMode(pg.ViewBox.PanMode)
+    if reduced_heights is None:
+        reduced_classification = classification_image(types)
+        reduced_status = "削減後マップを読み込めません"
+    else:
+        reduced_classification = reduced_classification_image(reduced_types, reduced_heights)
+        reduced_status = None
+    reduced_image = pg.ImageItem(reduced_classification, axisOrder="row-major")
+    reduced_view.addItem(reduced_image)
+    reduced_view.autoRange()
+    stack.addWidget(reduced_graphics)
+
+    if reduced_status is not None:
+        message = pg.TextItem(reduced_status, anchor=(0.5, 0.5))
+        message.setPos(reduced_view.viewRange()[0][0], reduced_view.viewRange()[1][0])
+        reduced_view.addItem(message)
 
     # 標高ビュー
     elevation_graphics = pg.GraphicsLayoutWidget()
@@ -191,6 +272,24 @@ def main():
     elevation_view.addItem(elevation_image_item)
     elevation_view.autoRange()
     stack.addWidget(elevation_graphics)
+
+    # 標高ビュー（削減後）
+    reduced_elevation_graphics = pg.GraphicsLayoutWidget()
+    reduced_elevation_view = reduced_elevation_graphics.addViewBox()
+    reduced_elevation_view.setAspectLocked(True)
+    reduced_elevation_view.invertY(True)
+    reduced_elevation_view.setMouseMode(pg.ViewBox.PanMode)
+    if reduced_heights is None:
+        reduced_elevation = elevation_image(heights)
+    else:
+        reduced_elevation = elevation_image(reduced_heights)
+    reduced_elevation_image_item = pg.ImageItem(
+        reduced_elevation,
+        axisOrder="row-major",
+    )
+    reduced_elevation_view.addItem(reduced_elevation_image_item)
+    reduced_elevation_view.autoRange()
+    stack.addWidget(reduced_elevation_graphics)
 
     # 欠損点ビュー
     missing_graphics = pg.GraphicsLayoutWidget()
@@ -305,35 +404,102 @@ def main():
         if index == 0:
             image.setImage(classification_image(types), autoLevels=False)
         elif index == 1:
-            elevation_image_item.setImage(elevation_image(heights), autoLevels=False)
+            if reduced_heights is not None:
+                reduced_image.setImage(
+                    reduced_classification_image(reduced_types, reduced_heights),
+                    autoLevels=False,
+                )
         elif index == 2:
+            elevation_image_item.setImage(elevation_image(heights), autoLevels=False)
+        elif index == 3:
+            if reduced_heights is not None:
+                reduced_elevation_image_item.setImage(
+                    elevation_image(reduced_heights),
+                    autoLevels=False,
+                )
+        elif index == 4:
             missing_image_item.setImage(missing_image, autoLevels=False)
 
     # ビューア上でのマウス移動時の処理
-    def on_mouse_moved(position, target_view, target_image):
+    def on_mouse_moved(
+        position,
+        target_view,
+        target_image,
+        target_heights,
+        target_types,
+        target_missing,
+        view_mode,
+    ):
         if not target_view.sceneBoundingRect().contains(position):
             return
         point = target_image.mapFromScene(position)
         col, row = int(np.floor(point.x())), int(np.floor(point.y()))
-        if 0 <= row < heights.shape[0] and 0 <= col < heights.shape[1]:
-            height = heights[row, col]
-            height_text = (
-                "欠損（補間値）"
-                if missing_mask[row, col]
-                else f"{height:.2f} m"
-            )
+        if 0 <= row < target_heights.shape[0] and 0 <= col < target_heights.shape[1]:
+            height = target_heights[row, col]
+            original_missing = target_missing[row, col]
+            original_height = heights[row, col]
+
+            if view_mode == "before":
+                if original_missing:
+                    if np.isfinite(original_height):
+                        height_text = f"元の欠損点（補間値: {original_height:.2f} m）"
+                    else:
+                        height_text = "元の欠損点（補間不能）"
+                else:
+                    height_text = f"{height:.2f} m"
+            elif view_mode == "reduced":
+                if not np.isfinite(height):
+                    if np.isfinite(original_height):
+                        height_text = f"削減済み（元の高さ: {original_height:.2f} m）"
+                    else:
+                        height_text = "削減済み"
+                elif original_missing:
+                    height_text = f"元の欠損点（補間値: {height:.2f} m）"
+                else:
+                    height_text = f"{height:.2f} m"
+            else:
+                if original_missing:
+                    height_text = f"元の欠損点（補間値: {height:.2f} m）"
+                elif not np.isfinite(height):
+                    height_text = "削減済み"
+                else:
+                    height_text = f"{height:.2f} m"
             z = origin_z + heights.shape[0] - 1 - row
             window.statusBar().showMessage(
                 f"Row: {row}  Col: {col}  x: {origin_x + col}  z: {z}  "
-                f"高さ: {height_text}  分類: {TYPE_NAMES.get(int(types[row, col]), 'Unknown')}"
+                f"高さ: {height_text}  分類: {TYPE_NAMES.get(int(target_types[row, col]), 'Unknown')}"
             )
 
 
     # イベントの接続
     output_selector.currentIndexChanged.connect(update_output)
-    graphics.scene().sigMouseMoved.connect(lambda position: on_mouse_moved(position, view, image))
-    elevation_graphics.scene().sigMouseMoved.connect(lambda position: on_mouse_moved(position, elevation_view, elevation_image_item))
-    missing_graphics.scene().sigMouseMoved.connect(lambda position: on_mouse_moved(position, missing_view, missing_image_item)) 
+    graphics.scene().sigMouseMoved.connect(lambda position: on_mouse_moved(
+        position, view, image, heights, types, missing_mask, "before"
+    ))
+    reduced_graphics.scene().sigMouseMoved.connect(lambda position: on_mouse_moved(
+        position,
+        reduced_view,
+        reduced_image,
+        reduced_heights if reduced_heights is not None else heights,
+        reduced_types if reduced_types is not None else types,
+        missing_mask,
+        "reduced",
+    ))
+    elevation_graphics.scene().sigMouseMoved.connect(lambda position: on_mouse_moved(
+        position, elevation_view, elevation_image_item, heights, types, missing_mask, "before"
+    ))
+    reduced_elevation_graphics.scene().sigMouseMoved.connect(lambda position: on_mouse_moved(
+        position,
+        reduced_elevation_view,
+        reduced_elevation_image_item,
+        reduced_heights if reduced_heights is not None else heights,
+        reduced_types if reduced_types is not None else types,
+        missing_mask,
+        "reduced",
+    ))
+    missing_graphics.scene().sigMouseMoved.connect(lambda position: on_mouse_moved(
+        position, missing_view, missing_image_item, heights, types, missing_mask, "before"
+    ))
 
     # メインウィンドウのサイズを設定して表示
     window.resize(1100, 750)
