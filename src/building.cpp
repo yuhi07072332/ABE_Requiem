@@ -172,9 +172,9 @@ static void scan_outlines(const MapData& data, Building& building) {
     outline_path = std::move(simplified_path);
 }
 
-/// @brief RDPアルゴリズム
-static void rdp(const std::vector<Coord>& outline_path,
-                std::vector<bool>& keep,
+/// @brief RDPアルゴリズムを再帰的に適用して中間座標を削除する
+static void rdp(Building& building,
+                const std::vector<Coord>& outline_path,
                 std::size_t first,
                 std::size_t last,
                 long double epsilon_squared) {
@@ -207,9 +207,12 @@ static void rdp(const std::vector<Coord>& outline_path,
     }
 
     if (max_distance_squared > epsilon_squared) {
-        keep[farthest] = true;
-        rdp(outline_path, keep, first, farthest, epsilon_squared);
-        rdp(outline_path, keep, farthest, last, epsilon_squared);
+        rdp(building, outline_path, first, farthest, epsilon_squared);
+        rdp(building, outline_path, farthest, last, epsilon_squared);
+    } else {
+        for (std::size_t i = first + 1; i < last; ++i) {
+            building.coords.erase(outline_path[i]);
+        }
     }
 }
 
@@ -218,29 +221,24 @@ static void rdp(const std::vector<Coord>& outline_path,
 /// @details
 /// 参考:
 /// https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm
-static void simplify_outline(Building& building, std::uint32_t epsilon) {
+static void simplify_outlines(Building& building, std::uint32_t epsilon) {
     for (auto& outline_path : building.outline_paths) {
         if (outline_path.size() < 3) continue;
 
-        std::set<Coord> original(outline_path.begin(), outline_path.end());
-        std::vector<bool> keep(outline_path.size(), false);
-        keep.front() = true;
-        keep.back() = true;
         const long double epsilon_squared =
             static_cast<long double>(epsilon) * epsilon;
-        rdp(outline_path, keep, 0, outline_path.size() - 1, epsilon_squared);
+        rdp(building,
+            outline_path,
+            0,
+            outline_path.size() - 1,
+            epsilon_squared);
 
         std::vector<Coord> simplified_path;
         simplified_path.reserve(outline_path.size());
-        for (std::size_t i = 0; i < outline_path.size(); ++i) {
-            if (keep[i]) simplified_path.push_back(outline_path[i]);
+        for (Coord c : outline_path) {
+            if (building.coords.contains(c)) simplified_path.push_back(c);
         }
         outline_path = std::move(simplified_path);
-
-        for (Coord c : original) {
-            if (!std::ranges::contains(outline_path, c))
-                building.coords.erase(c);
-        }
     }
 }
 
@@ -252,7 +250,7 @@ void process_buildings(MapData& data) {
         // building.top_left.j, building.bottom_right.i,
         // building.bottom_right.j);
         scan_outlines(data, building);
-        simplify_outline(building, 1);
+        simplify_outlines(building, 1);
     }
 }
 
