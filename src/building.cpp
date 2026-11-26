@@ -243,11 +243,11 @@ static void simplify_outlines(Building& building, std::uint32_t epsilon) {
 }
 
 /// @brief 建物に対して輪郭追跡と輪郭削減を行う
-void process_buildings(MapData& data) {
+void process_buildings(MapData& data, std::uint32_t level) {
     std::println("輪郭追跡...");
     for (auto& building : data.buildings) scan_outlines(data, building);
     std::println("輪郭平滑化...");
-    for (auto& building : data.buildings) simplify_outlines(building, 1);
+    for (auto& building : data.buildings) simplify_outlines(building, level);
 }
 
 // ──────────────────────────────── test ─────────────────────────────

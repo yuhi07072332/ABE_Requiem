@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <iosfwd>
 #include <functional>
@@ -16,6 +17,7 @@ struct Option {
     
     int smooth_ground = 16;
     int smooth_building = 16;
+    std::uint32_t smooth_outline = 1;
     bool colorful_buildings = false;
 
     std::ofstream open_output_file() const;

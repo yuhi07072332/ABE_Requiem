@@ -120,6 +120,11 @@ Option parse_args(int argc, const char** argv) {
         .metavar("<N>")
         .help("建物の平滑化の強度を指定[デフォルト=16]");
 
+    parser.add_argument("--smooth-outline")
+        .store_into(opt.smooth_outline)
+        .metavar("<N>")
+        .help("建物輪郭の平滑化の強度を指定[デフォルト=1]");
+
     parser.add_argument("-a", "--append")
         .flag()
         .help("出力する際にファイルを上書きするのではなく追加する")
