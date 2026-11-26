@@ -203,6 +203,17 @@ void inspect(const Option& opt) {
                  ground_erased,
                  building_before,
                  building_erased);
+
+    std::println(ofs, "REDUCED_MAP 1");
+    std::println(ofs, "{} {} {} {}", data.rows, data.cols, data.x, data.z);
+    for (int i = 0; i < data.rows; ++i) {
+        for (int j = 0; j < data.cols; ++j) {
+            std::println(ofs, "{} {} {}",
+                         data.at(i, j),
+                         static_cast<int>(data.type_at(i, j)),
+                         originally_missing[i * data.cols + j] ? 1 : 0);
+        }
+    }
     ofs.close();
 
     // Pythonのビューアを起動
