@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <iosfwd>
 #include <functional>
@@ -14,8 +15,12 @@ struct Option {
     std::filesystem::path output_file;              // 出力ファイル
     bool append = false;                            // 出力する際にファイルを上書きするのではなく追加する
     
-    int smooth_ground = 16;
-    int smooth_building = 16;
+    double smooth_ground_threshold = 0.1;
+    int smooth_ground_block = 64;
+    double smooth_building_threshold = 0.1;
+    int smooth_building_block = 16;
+
+    std::uint32_t smooth_outline = 1;
     bool colorful_buildings = false;
 
     std::ofstream open_output_file() const;

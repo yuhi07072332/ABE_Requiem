@@ -118,8 +118,7 @@ void show_mapdata_buildings(const MapData& data);
 
 /* ----- building ----- */
 
-void process_building(MapData& data);
-void test_building_algor();
+void process_buildings(MapData& data, std::uint32_t level);
 
 /* ----- algorithm ----- */
 
@@ -133,8 +132,8 @@ void fill_missing(MapData& data);
 
 /* ----- smooth ------ */
 
-void smooth_ground(MapData& data, int level);
-void smooth_buildings(MapData& data, int level);
+void smooth_ground(MapData& data, int max_block, double init_threshold);
+void smooth_buildings(MapData& data, int max_block, double init_threshold);
 
 /* ----- vrml ----- */
 
