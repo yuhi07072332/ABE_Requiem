@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cassert>
 #include <limits>
-#include <print>
 
 #include "genk.hpp"
 #include <third_party/decoterm.hpp>

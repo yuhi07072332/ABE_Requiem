@@ -1,6 +1,7 @@
 #include <cassert>
 #include <map>
 #include <ostream>
+#include <set>
 #include <string_view>
 #include <print>
 #include <vector>
@@ -313,10 +314,20 @@ Inline {{
 }}
 )";
 
+    const std::set<Coord> corners = {{
+        {0, 0}, {0, data.cols - 1},
+        {data.rows - 1, 0}, {data.rows - 1, data.cols - 1}
+    }};
+
     std::vector<Coord> ground_coords;
+
+    for (Coord c : corners) ground_coords.push_back(c);
 
     for (int i = 0; i < data.rows; ++i) { 
         for (int j = 0; j < data.cols; ++j) {
+            if (corners.contains(Coord {i, j})) {
+                continue;
+            }
             if (data.is_missing(i, j)) continue;
             switch (data.type_at(i, j)) {
                 case Type::Ground: ground_coords.emplace_back(i, j); break;
