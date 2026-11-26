@@ -323,6 +323,34 @@ void fill_missing(MapData& data) {
         }
     }
 
+    // 8近傍に内側Buildingがない輪郭点は建物領域から除外する
+    for (Building& building : data.buildings) {
+        std::vector<Coord> unsupported_outlines;
+        for (Coord c : building.coords) {
+            if (data.type_at(c) != Type::BuildingOutline) continue;
+
+            bool has_inner_building = false;
+            for (Coord dir : dirs) {
+                const Coord neighbor = c + dir;
+                if (data.contains(neighbor)
+                    && data.type_at(neighbor) == Type::Building) {
+                    has_inner_building = true;
+                    break;
+                }
+            }
+
+            if (!has_inner_building) {
+                data.type_at(c) = Type::Other;
+                ++data.other_coords;
+                unsupported_outlines.push_back(c);
+            }
+        }
+
+        for (Coord c : unsupported_outlines) {
+            building.coords.erase(c);
+        }
+    }
+
     // 輪郭を再計算した結果に合わせて建物点数を更新する
     data.building_coords = 0;
     data.building_outline_coords = 0;
