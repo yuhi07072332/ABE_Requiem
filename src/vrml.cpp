@@ -172,7 +172,7 @@ static void add_building_top(IndexedFaceSet& ifs,
 
     CDT::EdgeVec edges;
     for (const auto& path : building.outline_paths) {
-        for (std::size_t n = path.size(), i = 0; i < n; ++i) {
+        for (std::size_t n = path.size(), i = 0; i + 1 < n; ++i) {
             const Coord c1 = path[i];
             const Coord c2 = path[i + 1];
             edges.emplace_back(

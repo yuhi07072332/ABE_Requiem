@@ -247,7 +247,12 @@ void process_buildings(MapData& data, std::uint32_t level) {
     std::println("輪郭追跡...");
     for (auto& building : data.buildings) scan_outlines(data, building);
     std::println("輪郭平滑化...");
-    for (auto& building : data.buildings) simplify_outlines(building, level);
+    for (auto& building : data.buildings) {
+        const std::size_t before = building.coords.size();
+        simplify_outlines(building, level);
+        const std::size_t after = building.coords.size();
+        data.building_outline_coords -= before - after;
+    }
 }
 
 // ──────────────────────────────── test ─────────────────────────────

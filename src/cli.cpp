@@ -118,12 +118,12 @@ Option parse_args(int argc, const char** argv) {
     parser.add_argument("--smooth-building")
         .store_into(opt.smooth_building)
         .metavar("<N>")
-        .help("建物の平滑化の強度を指定[デフォルト=16]");
+        .help("建物上面の平滑化の強度を指定[デフォルト=16]");
 
     parser.add_argument("--smooth-outline")
         .store_into(opt.smooth_outline)
         .metavar("<N>")
-        .help("建物輪郭の平滑化の強度を指定[デフォルト=1]");
+        .help("建物輪郭削減の強度を指定[デフォルト=1]");
 
     parser.add_argument("-a", "--append")
         .flag()
