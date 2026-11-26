@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstdint>
 #include <format>
+#include <limits>
 #include <optional>
 #include <print>
 #include <ranges>
@@ -177,7 +178,8 @@ static void rdp(Building& building,
                 const std::vector<Coord>& outline_path,
                 std::size_t first,
                 std::size_t last,
-                long double epsilon_squared) {
+                long double epsilon_squared,
+                const auto& erase) {
     const Coord begin = outline_path[first];
     const Coord end = outline_path[last];
     const long double di = static_cast<long double>(end.i) - begin.i;
@@ -207,10 +209,11 @@ static void rdp(Building& building,
     }
 
     if (max_distance_squared > epsilon_squared) {
-        rdp(building, outline_path, first, farthest, epsilon_squared);
-        rdp(building, outline_path, farthest, last, epsilon_squared);
+        rdp(building, outline_path, first, farthest, epsilon_squared, erase);
+        rdp(building, outline_path, farthest, last, epsilon_squared, erase);
     } else {
         for (std::size_t i = first + 1; i < last; ++i) {
+            erase(outline_path[i]);
             building.coords.erase(outline_path[i]);
         }
     }
@@ -221,7 +224,7 @@ static void rdp(Building& building,
 /// @details
 /// 参考:
 /// https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm
-static void simplify_outlines(Building& building, std::uint32_t epsilon) {
+static void simplify_outlines(MapData& data, Building& building, std::uint32_t epsilon) {
     for (auto& outline_path : building.outline_paths) {
         if (outline_path.size() < 3) continue;
 
@@ -231,7 +234,11 @@ static void simplify_outlines(Building& building, std::uint32_t epsilon) {
             outline_path,
             0,
             outline_path.size() - 1,
-            epsilon_squared);
+            epsilon_squared,
+            [&](Coord c){
+                building.coords.erase(c);
+                data.at(c) = std::numeric_limits<double>::quiet_NaN();
+            });
 
         std::vector<Coord> simplified_path;
         simplified_path.reserve(outline_path.size());
@@ -249,7 +256,7 @@ void process_buildings(MapData& data, std::uint32_t level) {
     std::println("輪郭平滑化...");
     for (auto& building : data.buildings) {
         const std::size_t before = building.coords.size();
-        simplify_outlines(building, level);
+        simplify_outlines(data, building, level);
         const std::size_t after = building.coords.size();
         data.building_outline_coords -= before - after;
     }
