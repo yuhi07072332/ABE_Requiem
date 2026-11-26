@@ -184,7 +184,126 @@ void fill_missing(MapData& data) {
         }
     }
 
-    // 欠損補完後の建物領域から輪郭を作り直し、古い輪郭判定を残さない
+    // 補完後もTypeがUnknownの有効点を、近傍Typeの多数決で分類する
+    std::queue<Coord> unknown_queue;
+    for (int i = 0; i < data.rows; ++i) {
+        for (int j = 0; j < data.cols; ++j) {
+            const Coord current{i, j};
+            if (data.is_missing(current)
+                || data.type_at(current) != Type::Unknown) {
+                continue;
+            }
+
+            for (Coord dir : dirs) {
+                const Coord neighbor = current + dir;
+                if (!data.contains(neighbor) || data.is_missing(neighbor)) {
+                    continue;
+                }
+                if (data.type_at(neighbor) == Type::Unknown) continue;
+
+                unknown_queue.push(current);
+                queued[i][j] = true;
+                break;
+            }
+        }
+    }
+
+    // 高さは変えず、決まったTypeを隣接するUnknown点へ伝播させる
+    while (!unknown_queue.empty()) {
+        const Coord current = unknown_queue.front();
+        unknown_queue.pop();
+
+        std::array<unsigned int, 5> type_counts{};
+        std::vector<unsigned int> building_votes(data.buildings.size(), 0);
+        for (Coord dir : dirs) {
+            const Coord neighbor = current + dir;
+            if (!data.contains(neighbor) || data.is_missing(neighbor)) continue;
+
+            const Type type = data.type_at(neighbor);
+            if (type == Type::Unknown) continue;
+            ++type_counts[static_cast<std::size_t>(type)];
+
+            const int building_id =
+                building_ids[neighbor.i * data.cols + neighbor.j];
+            if (building_id >= 0) {
+                ++building_votes[static_cast<std::size_t>(building_id)];
+            }
+        }
+
+        Type selected_type = Type::Unknown;
+        unsigned int max_count = 0;
+        for (Type type : tie_priority) {
+            const auto type_index = static_cast<std::size_t>(type);
+            if (type_counts[type_index] > max_count) {
+                selected_type = type;
+                max_count = type_counts[type_index];
+            }
+        }
+        if (selected_type == Type::Unknown) continue;
+
+        const Type filled_type =
+            selected_type == Type::BuildingOutline
+                ? Type::Building
+                : selected_type;
+        data.type_at(current) = filled_type;
+
+        switch (filled_type) {
+            case Type::Ground:
+                ++data.ground_coords;
+                break;
+            case Type::Building:
+                ++data.building_coords;
+                break;
+            case Type::BuildingOutline:
+                ++data.building_outline_coords;
+                break;
+            case Type::Other:
+                ++data.other_coords;
+                break;
+            case Type::Unknown:
+                break;
+        }
+
+        if (filled_type == Type::Building) {
+            int selected_building = -1;
+            unsigned int max_building_votes = 0;
+            for (std::size_t id = 0; id < building_votes.size(); ++id) {
+                if (building_votes[id] > max_building_votes) {
+                    selected_building = static_cast<int>(id);
+                    max_building_votes = building_votes[id];
+                }
+            }
+            if (selected_building >= 0) {
+                data.buildings[static_cast<std::size_t>(selected_building)]
+                    .append(current);
+                building_ids[current.i * data.cols + current.j] =
+                    selected_building;
+            }
+        }
+
+        for (Coord dir : dirs) {
+            const Coord neighbor = current + dir;
+            if (!data.contains(neighbor) || data.is_missing(neighbor)) continue;
+            if (data.type_at(neighbor) != Type::Unknown) continue;
+            if (queued[neighbor.i][neighbor.j]) continue;
+
+            unknown_queue.push(neighbor);
+            queued[neighbor.i][neighbor.j] = true;
+        }
+    }
+
+    // 近傍からも分類できなかった有効点はOtherにする
+    for (int i = 0; i < data.rows; ++i) {
+        for (int j = 0; j < data.cols; ++j) {
+            if (data.is_missing(i, j) || data.type_at(i, j) != Type::Unknown) {
+                continue;
+            }
+            data.type_at(i, j) = Type::Other;
+            ++data.other_coords;
+        }
+    }
+
+    // 欠損補完後の建物領域から輪郭を作り直す
     for (Building& building : data.buildings) {
         for (Coord c : building.coords) {
             data.type_at(c) = Type::Building;
