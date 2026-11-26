@@ -21,7 +21,7 @@ void exec_all(MapData& data, const Option& opt) {
     std::println("{}", "欠損点補間..." | hl);
     fill_missing(data);
 
-    std::println("{}", "建物輪郭検出/削減..." | hl);
+    std::println("{}", "建物処理..." | hl);
     process_buildings(data);
 
     const int ground_before = data.ground_coords;

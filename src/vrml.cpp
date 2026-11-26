@@ -58,8 +58,6 @@ Shape {{
     std::print(os, FMT2);
 }
 
-
-
 static Point v2d_to_Point(CDT::V2d<double> v, const MapData& data) {
     return Point {
         .x = v.x,
@@ -67,7 +65,6 @@ static Point v2d_to_Point(CDT::V2d<double> v, const MapData& data) {
         .z = v.y
     };
 }
-
 
 struct IndexedFaceSet {
     std::string diffuse_color;
@@ -176,12 +173,12 @@ static void add_building_top(IndexedFaceSet& ifs,
     CDT::EdgeVec edges;
     for (const auto& path : building.outline_paths) {
         for (std::size_t n = path.size(), i = 0; i < n; ++i) {
-            const Coord c1 = path[i % n];
-            const Coord c2 = path[(i + 1) % n];
-                edges.emplace_back(
-                    outline_indices.at(c1),
-                    outline_indices.at(c2)
-                );
+            const Coord c1 = path[i];
+            const Coord c2 = path[i + 1];
+            edges.emplace_back(
+                outline_indices.at(c1),
+                outline_indices.at(c2)
+            );
         }
     }
 
@@ -212,7 +209,8 @@ static void add_building_wall(IndexedFaceSet& ifs,
             || data.type_at(c) == Type::BuildingOutline);
     };
 
-    for (const auto& outline : building.outline_paths) {
+    for (const auto& outline : building.outline_paths
+            | views::take(building.outline_paths.size() - 1)) {
         for (Coord c : outline) {
             const int base = ifs.vertices.size();
 

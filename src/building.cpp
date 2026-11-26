@@ -244,14 +244,10 @@ static void simplify_outlines(Building& building, std::uint32_t epsilon) {
 
 /// @brief 建物に対して輪郭追跡と輪郭削減を行う
 void process_buildings(MapData& data) {
-    std::println("建物削減中...");
-    for (auto [n, building] : data.buildings | views::enumerate) {
-        // std::println("建物{}: {}, {} -> {}, {}", n, building.top_left.i,
-        // building.top_left.j, building.bottom_right.i,
-        // building.bottom_right.j);
-        scan_outlines(data, building);
-        simplify_outlines(building, 1);
-    }
+    std::println("輪郭追跡...");
+    for (auto& building : data.buildings) scan_outlines(data, building);
+    std::println("輪郭平滑化...");
+    for (auto& building : data.buildings) simplify_outlines(building, 1);
 }
 
 // ──────────────────────────────── test ─────────────────────────────
