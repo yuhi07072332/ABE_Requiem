@@ -1,25 +1,17 @@
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstdint>
-#include <mdspan>
+#include <format>
 #include <optional>
 #include <print>
 #include <ranges>
 #include <set>
 #include <vector>
-#include <format>
-#include <print>
-#include <cassert>
 
 #include "genk.hpp"
 
 namespace views = std::views;
-
-template <typename T>
-using Matrix = std::mdspan<T, std::dextents<std::size_t, 2>>;
-
-// std::vector<bool>避ける用
-using Bool = std::int8_t;
 
 // clang-format off
 
@@ -90,18 +82,19 @@ static std::optional<TraceState> trace_next(TraceState state,
         if (visited.contains(nc)) continue;
 
         int prev_dir = (dir + 7) % 8;
-        return TraceState {
-            .current = nc,
-            .backtrack = current + n8_dirs.at(prev_dir)
-        };
+        return TraceState {.current = nc,
+                           .backtrack = current + n8_dirs.at(prev_dir)};
     }
 
     return std::nullopt;
 }
 
-/// @brief Moore neighborhood tracingを使ってbeginから建物の輪郭を時計回りに探索する 
+/// @brief Moore neighborhood tracingを使ってbeginから建物の輪郭を
+/// 時計回りに探索する
 ///
-/// @details 輪郭が閉路でなかった場合はnulloptを返す
+/// @details
+/// * 輪郭が閉路でなかった場合はnulloptを返す
+/// * 閉路の末尾の点は最初の点と一致する
 /// 参考:
 /// https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/moore.html
 static std::optional<std::vector<Coord>> mnt(const MapData& data,
@@ -113,20 +106,22 @@ static std::optional<std::vector<Coord>> mnt(const MapData& data,
     // 輪郭が閉曲線じゃない場合の無限ループを防ぐため、stateが重複しているかどうかも判定する
     std::set<TraceState> visited_state;
 
-    TraceState init_state = {
-        .current = begin,
-        .backtrack = begin - Coord {0, 1}
-    };
+    TraceState init_state = {.current = begin,
+                             .backtrack = begin - Coord {0, 1}};
 
     std::vector<Coord> outline_path = {begin};
 
     std::optional<TraceState> curr_state = init_state;
 
     while (true) {
-        if (auto [_, inserted] = visited_state.insert(*curr_state); !inserted) break;
+        if (auto [_, inserted] = visited_state.insert(*curr_state); !inserted)
+            break;
         curr_state = trace_next(*curr_state, data, building, visited);
         if (!curr_state.has_value()) break;
-        if (*curr_state == init_state) return outline_path;
+        if (*curr_state == init_state) {
+            outline_path.push_back(outline_path.front());
+            return outline_path;
+        }
         assert(building.coords.contains(curr_state->current));
 
         outline_path.push_back(curr_state->current);
@@ -144,23 +139,25 @@ static void scan_outlines(const MapData& data, Building& building) {
         if (data.type_at(c) == Type::BuildingOutline) {
             auto outline = mnt(data, c, building, visited);
             if (!outline) continue;
-            for (Coord c : *outline) visited.insert(c);
+            for (Coord c : *outline)
+                visited.insert(c);
             building.outline_paths.emplace_back(std::move(*outline));
         }
     }
 }
 
 /// @brief outline_pathに対して直線の簡略化を行う
-static void simplify_outline(Building& building, std::vector<Coord>& outline_path) {
+[[maybe_unused]] static void simplify_outline_old(
+    Building& building, std::vector<Coord>& outline_path) {
     if (outline_path.size() < 2) return;
 
-    std::set<Coord> vertices { outline_path.front() };
+    std::set<Coord> vertices {outline_path.front()};
 
     Coord prev_dir = outline_path.at(1) - outline_path.at(0);
 
     for (std::size_t i = 0; i < outline_path.size(); ++i) {
-        const Coord dir = outline_path.at((i + 1) % outline_path.size())
-            - outline_path.at(i);
+        const Coord dir =
+            outline_path.at((i + 1) % outline_path.size()) - outline_path.at(i);
         if (dir != prev_dir) vertices.insert(outline_path.at(i));
         prev_dir = dir;
     }
@@ -175,19 +172,92 @@ static void simplify_outline(Building& building, std::vector<Coord>& outline_pat
     outline_path = std::move(simplified_path);
 }
 
-void process_building(MapData& data) {
-    std::println("建物削減中...");
-    for (auto [n, building] : data.buildings | views::enumerate) {
-        // std::println("建物{}: {}, {} -> {}, {}", n, building.top_left.i, building.top_left.j, building.bottom_right.i, building.bottom_right.j);
-        scan_outlines(data, building);
-        for (auto& outline_path : building.outline_paths) {
-            simplify_outline(building, outline_path);
+/// @brief RDPアルゴリズム
+static void rdp(const std::vector<Coord>& outline_path,
+                std::vector<bool>& keep,
+                std::size_t first,
+                std::size_t last,
+                long double epsilon_squared) {
+    const Coord begin = outline_path[first];
+    const Coord end = outline_path[last];
+    const long double di = static_cast<long double>(end.i) - begin.i;
+    const long double dj = static_cast<long double>(end.j) - begin.j;
+    const long double length_squared = di * di + dj * dj;
+
+    long double max_distance_squared = -1;
+    std::size_t farthest = first;
+    for (std::size_t i = first + 1; i < last; ++i) {
+        const long double pi =
+            static_cast<long double>(outline_path[i].i) - begin.i;
+        const long double pj =
+            static_cast<long double>(outline_path[i].j) - begin.j;
+        long double distance_squared;
+
+        if (length_squared == 0) {
+            distance_squared = pi * pi + pj * pj;
+        } else {
+            const long double cross = pi * dj - pj * di;
+            distance_squared = cross * cross / length_squared;
+        }
+
+        if (distance_squared > max_distance_squared) {
+            max_distance_squared = distance_squared;
+            farthest = i;
+        }
+    }
+
+    if (max_distance_squared > epsilon_squared) {
+        keep[farthest] = true;
+        rdp(outline_path, keep, first, farthest, epsilon_squared);
+        rdp(outline_path, keep, farthest, last, epsilon_squared);
+    }
+}
+
+/// @brief 輪郭のパスに対してRDPアルゴリズムで削減を行う
+///
+/// @details
+/// 参考:
+/// https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm
+static void simplify_outline(Building& building, std::uint32_t epsilon) {
+    for (auto& outline_path : building.outline_paths) {
+        if (outline_path.size() < 3) continue;
+
+        std::set<Coord> original(outline_path.begin(), outline_path.end());
+        std::vector<bool> keep(outline_path.size(), false);
+        keep.front() = true;
+        keep.back() = true;
+        const long double epsilon_squared =
+            static_cast<long double>(epsilon) * epsilon;
+        rdp(outline_path, keep, 0, outline_path.size() - 1, epsilon_squared);
+
+        std::vector<Coord> simplified_path;
+        simplified_path.reserve(outline_path.size());
+        for (std::size_t i = 0; i < outline_path.size(); ++i) {
+            if (keep[i]) simplified_path.push_back(outline_path[i]);
+        }
+        outline_path = std::move(simplified_path);
+
+        for (Coord c : original) {
+            if (!std::ranges::contains(outline_path, c))
+                building.coords.erase(c);
         }
     }
 }
 
+/// @brief 建物に対して輪郭追跡と輪郭削減を行う
+void process_buildings(MapData& data) {
+    std::println("建物削減中...");
+    for (auto [n, building] : data.buildings | views::enumerate) {
+        // std::println("建物{}: {}, {} -> {}, {}", n, building.top_left.i,
+        // building.top_left.j, building.bottom_right.i,
+        // building.bottom_right.j);
+        scan_outlines(data, building);
+        simplify_outline(building, 1);
+    }
+}
+
 // ──────────────────────────────── test ─────────────────────────────
-# if 0
+#if 0
 
 static constexpr int TEST_DATA_SIZE = 32;
 
@@ -358,4 +428,4 @@ void test_building_algor() {
         }
     }
 }
-#endif 
+#endif

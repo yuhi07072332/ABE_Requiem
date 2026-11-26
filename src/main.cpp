@@ -21,8 +21,8 @@ void exec_all(MapData& data, const Option& opt) {
     std::println("{}", "欠損点補間..." | hl);
     fill_missing(data);
 
-    std::println("{}", "建物処理..." | hl);
-    process_building(data);
+    std::println("{}", "建物輪郭検出/削減..." | hl);
+    process_buildings(data);
 
     const int ground_before = data.ground_coords;
     const int building_before = data.building_coords + data.building_outline_coords;
@@ -165,7 +165,7 @@ void inspect(const Option& opt) {
     fill_missing(data);
 
     std::println("{}", "建物処理" | hl);
-    process_building(data);
+    process_buildings(data);
 
     // 一時ファイルにデータを保存
     constexpr const char* temp_file = "inspector_temp.dat";

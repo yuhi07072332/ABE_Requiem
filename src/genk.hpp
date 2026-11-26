@@ -118,7 +118,7 @@ void show_mapdata_buildings(const MapData& data);
 
 /* ----- building ----- */
 
-void process_building(MapData& data);
+void process_buildings(MapData& data);
 void test_building_algor();
 
 /* ----- algorithm ----- */
