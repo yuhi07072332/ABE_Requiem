@@ -9,8 +9,8 @@
 /// @brief 欠損点補完
 /// @details
 /// * 線形探索で有効なデータに隣接している欠損点をキューに入れる
-/// * 以降は幅優先探索で欠損点領域の外側から
-///   8近傍の有効なデータの中央値を取って欠損点を補完する
+/// * 以降は幅優先探索で欠損点領域の外側から、近傍Typeの多数決と
+///   選ばれたTypeの高さの中央値で欠損点を補完する
 /// * 補完した欠損点の8近傍を調べ、欠損点でキューに入っていないものを入れる
 void fill_missing(MapData& data) {
 
@@ -26,6 +26,28 @@ void fill_missing(MapData& data) {
         data.rows,
         std::vector<bool>(data.cols, false)
     );
+
+    // 補完した建物点を隣接する建物へ追加できるよう、座標からIDを引けるようにする
+    std::vector<int> building_ids(data.rows * data.cols, -1);
+    for (std::size_t id = 0; id < data.buildings.size(); ++id) {
+        for (Coord c : data.buildings[id].coords) {
+            building_ids[c.i * data.cols + c.j] = static_cast<int>(id);
+        }
+    }
+
+    // Type票が同数の場合は建物系を優先する
+    constexpr std::array<Type, 4> tie_priority = {
+        Type::Building,
+        Type::BuildingOutline,
+        Type::Ground,
+        Type::Other,
+    };
+    constexpr std::array<Coord, 4> outline_dirs = {
+        Coord {-1, 0},
+        Coord {0, 1},
+        Coord {1, 0},
+        Coord {0, -1},
+    };
 
 
     // 欠損点の座標をキューに入れる
@@ -58,24 +80,93 @@ void fill_missing(MapData& data) {
         Coord current = missing_queue.front();
         missing_queue.pop();
 
-        std::vector<double> heights;
+        // Typeの数値を添字に使い、Typeごとの票数と高さを集計する
+        std::array<std::vector<double>, 5> heights_by_type;
+        std::array<unsigned int, 5> type_counts{};
+        std::vector<double> all_heights;
+        std::vector<unsigned int> building_votes(data.buildings.size(), 0);
 
         for (Coord dir : dirs) {
             Coord neighbor = current + dir;
 
-            if (neighbor.i < 0 || neighbor.i >= data.rows) continue;
-            if (neighbor.j < 0 || neighbor.j >= data.cols) continue;
+            if (!data.contains(neighbor)) continue;
+            if (data.is_missing(neighbor)) continue;
 
-            if (!data.is_missing(neighbor)) {
-                heights.push_back(data.at(neighbor));
+            const double height = data.at(neighbor);
+            const Type type = data.type_at(neighbor);
+            all_heights.push_back(height);
+
+            if (type == Type::Unknown) continue;
+            const auto type_index = static_cast<std::size_t>(type);
+            heights_by_type[type_index].push_back(height);
+            ++type_counts[type_index];
+
+            const int building_id =
+                building_ids[neighbor.i * data.cols + neighbor.j];
+            if (building_id >= 0) {
+                ++building_votes[static_cast<std::size_t>(building_id)];
             }
         }
 
-        std::sort(heights.begin(), heights.end());
-        if (heights.empty()) continue;
+        if (all_heights.empty()) continue;
 
-        double median = heights.at(heights.size() / 2);    //偶数個の場合は中央2値のうち大きい方を使用
-        data.at(current) = median;
+        Type selected_type = Type::Unknown;
+        unsigned int max_count = 0;
+        for (Type type : tie_priority) {
+            const auto type_index = static_cast<std::size_t>(type);
+            if (type_counts[type_index] > max_count) {
+                selected_type = type;
+                max_count = type_counts[type_index];
+            }
+        }
+
+        std::vector<double>& heights =
+            selected_type == Type::Unknown
+                ? all_heights
+                : heights_by_type[static_cast<std::size_t>(selected_type)];
+        std::sort(heights.begin(), heights.end());
+        data.at(current) = heights.at(heights.size() / 2);
+
+        // 輪郭は建物領域の完成後に再計算するため、補完点は一旦Buildingにする
+        const Type filled_type =
+            selected_type == Type::BuildingOutline
+                ? Type::Building
+                : selected_type;
+        data.type_at(current) = filled_type;
+
+        switch (filled_type) {
+            case Type::Ground:
+                ++data.ground_coords;
+                break;
+            case Type::Building:
+                ++data.building_coords;
+                break;
+            case Type::BuildingOutline:
+                ++data.building_outline_coords;
+                break;
+            case Type::Other:
+                ++data.other_coords;
+                break;
+            case Type::Unknown:
+                break;
+        }
+
+        if (filled_type == Type::Building) {
+            int selected_building = -1;
+            unsigned int max_building_votes = 0;
+            for (std::size_t id = 0; id < building_votes.size(); ++id) {
+                if (building_votes[id] > max_building_votes) {
+                    selected_building = static_cast<int>(id);
+                    max_building_votes = building_votes[id];
+                }
+            }
+            if (selected_building >= 0) {
+                data.buildings[static_cast<std::size_t>(selected_building)]
+                    .append(current);
+                building_ids[current.i * data.cols + current.j] =
+                    selected_building;
+            }
+        }
 
         
         // 補完した欠損点の8近傍を調べ、欠損点でキューに入っていないものを入れる
@@ -90,6 +181,191 @@ void fill_missing(MapData& data) {
 
             missing_queue.push(neighbor);
             queued.at(neighbor.i).at(neighbor.j) = true;
+        }
+    }
+
+    // 補完後もTypeがUnknownの有効点を、近傍Typeの多数決で分類する
+    std::queue<Coord> unknown_queue;
+    for (int i = 0; i < data.rows; ++i) {
+        for (int j = 0; j < data.cols; ++j) {
+            const Coord current{i, j};
+            if (data.is_missing(current)
+                || data.type_at(current) != Type::Unknown) {
+                continue;
+            }
+
+            for (Coord dir : dirs) {
+                const Coord neighbor = current + dir;
+                if (!data.contains(neighbor) || data.is_missing(neighbor)) {
+                    continue;
+                }
+                if (data.type_at(neighbor) == Type::Unknown) continue;
+
+                unknown_queue.push(current);
+                queued[i][j] = true;
+                break;
+            }
+        }
+    }
+
+    // 高さは変えず、決まったTypeを隣接するUnknown点へ伝播させる
+    while (!unknown_queue.empty()) {
+        const Coord current = unknown_queue.front();
+        unknown_queue.pop();
+
+        std::array<unsigned int, 5> type_counts{};
+        std::vector<unsigned int> building_votes(data.buildings.size(), 0);
+        for (Coord dir : dirs) {
+            const Coord neighbor = current + dir;
+            if (!data.contains(neighbor) || data.is_missing(neighbor)) continue;
+
+            const Type type = data.type_at(neighbor);
+            if (type == Type::Unknown) continue;
+            ++type_counts[static_cast<std::size_t>(type)];
+
+            const int building_id =
+                building_ids[neighbor.i * data.cols + neighbor.j];
+            if (building_id >= 0) {
+                ++building_votes[static_cast<std::size_t>(building_id)];
+            }
+        }
+
+        Type selected_type = Type::Unknown;
+        unsigned int max_count = 0;
+        for (Type type : tie_priority) {
+            const auto type_index = static_cast<std::size_t>(type);
+            if (type_counts[type_index] > max_count) {
+                selected_type = type;
+                max_count = type_counts[type_index];
+            }
+        }
+        if (selected_type == Type::Unknown) continue;
+
+        const Type filled_type =
+            selected_type == Type::BuildingOutline
+                ? Type::Building
+                : selected_type;
+        data.type_at(current) = filled_type;
+
+        switch (filled_type) {
+            case Type::Ground:
+                ++data.ground_coords;
+                break;
+            case Type::Building:
+                ++data.building_coords;
+                break;
+            case Type::BuildingOutline:
+                ++data.building_outline_coords;
+                break;
+            case Type::Other:
+                ++data.other_coords;
+                break;
+            case Type::Unknown:
+                break;
+        }
+
+        if (filled_type == Type::Building) {
+            int selected_building = -1;
+            unsigned int max_building_votes = 0;
+            for (std::size_t id = 0; id < building_votes.size(); ++id) {
+                if (building_votes[id] > max_building_votes) {
+                    selected_building = static_cast<int>(id);
+                    max_building_votes = building_votes[id];
+                }
+            }
+            if (selected_building >= 0) {
+                data.buildings[static_cast<std::size_t>(selected_building)]
+                    .append(current);
+                building_ids[current.i * data.cols + current.j] =
+                    selected_building;
+            }
+        }
+
+        for (Coord dir : dirs) {
+            const Coord neighbor = current + dir;
+            if (!data.contains(neighbor) || data.is_missing(neighbor)) continue;
+            if (data.type_at(neighbor) != Type::Unknown) continue;
+            if (queued[neighbor.i][neighbor.j]) continue;
+
+            unknown_queue.push(neighbor);
+            queued[neighbor.i][neighbor.j] = true;
+        }
+    }
+
+    // 近傍からも分類できなかった有効点はOtherにする
+    for (int i = 0; i < data.rows; ++i) {
+        for (int j = 0; j < data.cols; ++j) {
+            if (data.is_missing(i, j) || data.type_at(i, j) != Type::Unknown) {
+                continue;
+            }
+            data.type_at(i, j) = Type::Other;
+            ++data.other_coords;
+        }
+    }
+
+    // 欠損補完後の建物領域から輪郭を作り直す
+    for (Building& building : data.buildings) {
+        for (Coord c : building.coords) {
+            data.type_at(c) = Type::Building;
+        }
+    }
+
+    for (const Building& building : data.buildings) {
+        for (Coord c : building.coords) {
+            for (Coord dir : outline_dirs) {
+                const Coord neighbor = c + dir;
+                if (!data.contains(neighbor)
+                    || !building.coords.contains(neighbor)) {
+                    data.type_at(c) = Type::BuildingOutline;
+                    break;
+                }
+            }
+        }
+    }
+
+    // 8近傍に内側Buildingがない輪郭点は建物領域から除外する
+    for (Building& building : data.buildings) {
+        std::vector<Coord> unsupported_outlines;
+        for (Coord c : building.coords) {
+            if (data.type_at(c) != Type::BuildingOutline) continue;
+
+            bool has_inner_building = false;
+            for (Coord dir : dirs) {
+                const Coord neighbor = c + dir;
+                if (data.contains(neighbor)
+                    && data.type_at(neighbor) == Type::Building) {
+                    has_inner_building = true;
+                    break;
+                }
+            }
+
+            if (!has_inner_building) {
+                data.type_at(c) = Type::Other;
+                ++data.other_coords;
+                unsupported_outlines.push_back(c);
+            }
+        }
+
+        for (Coord c : unsupported_outlines) {
+            building.coords.erase(c);
+        }
+    }
+
+    // 輪郭を再計算した結果に合わせて建物点数を更新する
+    data.building_coords = 0;
+    data.building_outline_coords = 0;
+    for (int i = 0; i < data.rows; ++i) {
+        for (int j = 0; j < data.cols; ++j) {
+            switch (data.type_at(i, j)) {
+                case Type::Building:
+                    ++data.building_coords;
+                    break;
+                case Type::BuildingOutline:
+                    ++data.building_outline_coords;
+                    break;
+                default:
+                    break;
+            }
         }
     }
 }
