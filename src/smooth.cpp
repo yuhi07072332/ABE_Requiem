@@ -90,6 +90,11 @@ unsigned int downsample_flat_points(MapData& data,
 
 /// 地面の平滑化を行う
 void smooth_ground(MapData& data, int max_block, double init_threshold) {
+    const std::array<Coord, 4> corners = {{
+        {0, 0}, {0, data.cols - 1},
+        {data.rows - 1, 0}, {data.rows - 1, data.cols - 1}
+    }};
+
     int before = data.ground_coords;
     int erased = 0;
 
@@ -100,7 +105,13 @@ void smooth_ground(MapData& data, int max_block, double init_threshold) {
             data,
             block_size,
             threshold,
-            [&](Coord c){ return data.type_at(c) == Type::Ground; },
+            [&](Coord c){
+                return data.type_at(c) == Type::Ground
+                    && c != corners[0]
+                    && c != corners[1]
+                    && c != corners[2]
+                    && c != corners[3];
+            },
             {0, 0},
             {data.rows - 1, data.cols - 1}
         );

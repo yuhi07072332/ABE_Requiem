@@ -140,10 +140,6 @@ void smooth_buildings(MapData& data, int max_block, double init_threshold);
 inline constexpr std::string_view VRML_HEADER = "#VRML V2.0 utf8";
 
 void write_elevation_grid(std::ostream& os, const MapData& data);
-int write_delaunay_triangulation(std::ostream& os,
-                                 const std::vector<Coord>& coords,
-                                 const MapData& data,
-                                 std::string_view diffuse_color = "0.5 0.5 0.5");
 void export_vrml(const MapData& data,
                 std::ostream& out,
                 std::ostream& out_ground,

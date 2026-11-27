@@ -36,7 +36,7 @@ static constexpr std::array<Coord, 4> n4_dirs = {{
 
 static const double INITIAL_GROUND_RATIO = 0.05;
 static const double GROUND_HEIGHT_DIFF_MAX = 1.0;
-static const double BUILDING_HEIGHT_DIFF_MIN = 2.0;
+static const double BUILDING_HEIGHT_DIFF_MIN = 4.0;
 
 /// @brief 有効な標高データの下位5%のしきい値を算出する
 static double calc_initial_ground_threshold(const MapData& data) {

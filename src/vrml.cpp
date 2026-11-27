@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <map>
 #include <ostream>
@@ -117,16 +118,16 @@ Shape {{
     }
 };
 
-/// @brief 点群に対しドロネーの三角形分割を実行し、IndexFacedSetとして出力
-/// @returns 三角形の面数
-int write_delaunay_triangulation(std::ostream& os,
+/// 地面を追加
+static void add_ground(IndexedFaceSet& ifs,
                                  const std::vector<Coord>& coords,
-                                 const MapData& data,
-                                 std::string_view diffuse_color) {
+                                 const MapData& data) {
     CDT::Triangulation<double> cdt;
 
     auto valid_coords = coords
         | views::filter([&](Coord c){ return !data.is_missing(c); });
+
+    const std::size_t base = ifs.vertices.size();
 
     cdt.insertVertices(valid_coords.begin(),
                        valid_coords.end(),
@@ -134,21 +135,40 @@ int write_delaunay_triangulation(std::ostream& os,
                        [&](Coord c) { return data.get_z(c); });
     cdt.eraseSuperTriangle();
 
-    IndexedFaceSet ifs = IndexedFaceSet(std::string(diffuse_color));
     for (CDT::V2d<double> v : cdt.vertices) {
         ifs.vertices.push_back(v2d_to_Point(v, data));
     }
 
+    std::map<std::pair<std::size_t, std::size_t>,
+             std::pair<std::size_t, std::size_t>> boundary;
     for (const auto& tri : cdt.triangles) {
-        ifs.faces.push_back(tri.vertices[2]);
-        ifs.faces.push_back(tri.vertices[1]);
-        ifs.faces.push_back(tri.vertices[0]);
+        const std::array<std::size_t, 3> vertices = {
+            tri.vertices[2] + base, tri.vertices[1] + base, tri.vertices[0] + base
+        };
+        ifs.faces.append_range(vertices);
         ifs.faces.push_back(-1);
+
+        for (std::size_t i = 0; i < vertices.size(); ++i) {
+            const auto a = vertices[i];
+            const auto b = vertices[(i + 1) % vertices.size()];
+            const auto key = std::minmax(a, b);
+            if (boundary.contains(key)) boundary.erase(key);
+            else boundary.emplace(key, std::pair{a, b});
+        }
     }
 
-    ifs.write_to(os);
-
-    return cdt.triangles.size();
+    for (const auto& [_, edge] : boundary) {
+        const auto [a, b] = edge;
+        const Point pa = ifs.vertices[a];
+        const Point pb = ifs.vertices[b];
+        const auto bottom = ifs.vertices.size();
+        ifs.vertices.push_back({pa.x, -30, pa.z});
+        ifs.vertices.push_back({pb.x, -30, pb.z});
+        ifs.faces.append_range(std::array<int64_t, 5>{
+            static_cast<int64_t>(b), static_cast<int64_t>(a),
+            static_cast<int64_t>(bottom), static_cast<int64_t>(bottom + 1), -1
+        });
+    }
 }
 
 /// 制限付きドロネー三角形分割を使って建物の上面をIndexedFaceSetに追加
@@ -310,11 +330,18 @@ Inline {{
                out_building_filename);
     
     std::print(out_ground, VRML_HEADER);
+    std::string ground_diffuse_color;
     if (colorful_buildings) {
-        write_delaunay_triangulation(out_ground, ground_coords, data, "0.3 0.3 0.3");
+        ground_diffuse_color = "0.3 0.3 0.3";
     } else {
-        write_delaunay_triangulation(out_ground, ground_coords, data, "0.35 0.43 0.67");
+        ground_diffuse_color =  "0.35 0.43 0.67";
     }
+
+    IndexedFaceSet ground_ifs = IndexedFaceSet(std::move(ground_diffuse_color));
+    add_ground(ground_ifs, ground_coords, data);
+
+    ground_ifs.write_to(out_ground);
+
     std::println("地面出力完了");
 
     std::print(out_building, VRML_HEADER);
