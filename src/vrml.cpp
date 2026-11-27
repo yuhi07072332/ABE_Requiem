@@ -203,47 +203,15 @@ static void add_building_top(IndexedFaceSet& ifs,
 static void add_building_wall(IndexedFaceSet& ifs,
                               const MapData& data,
                               const Building& building) {
-    auto is_building_type = [&](Coord c) {
-        return data.contains(c)
-            && (data.type_at(c) == Type::Building 
-            || data.type_at(c) == Type::BuildingOutline);
-    };
-
-    for (const auto& outline : building.outline_paths
-            | views::take(building.outline_paths.size() - 1)) {
-        for (Coord c : outline) {
+    for (const auto& outline : building.outline_paths) {
+        for (std::size_t i = 0; i + 1 < outline.size(); ++i) {
             const int base = ifs.vertices.size();
-
-            auto add_face = [&](std::array<int, 4> indices) {
-                for (int& i : indices) i += base;
-                ifs.faces.append_range(indices);
-                ifs.faces.push_back(-1);
-            };
-
-            auto [x, y, z] = data.point_at(c);
-
-            std::array<Point, 8> coord_vertices{{
-                {x - 0.5, -30, z - 0.5},
-                {x + 0.5, -30, z - 0.5},
-                {x + 0.5, -30, z + 0.5},
-                {x - 0.5, -30, z + 0.5},
-
-                {x - 0.5, y, z - 0.5},
-                {x + 0.5, y, z - 0.5},
-                {x + 0.5, y, z + 0.5},
-                {x - 0.5, y, z + 0.5},
-            }};
-
-            ifs.vertices.append_range(coord_vertices);
-
-            if (!is_building_type(c + Coord{-1, 0})) 
-                add_face({0, 4, 5, 1});
-            if (!is_building_type(c + Coord{0, 1})) 
-                add_face({1, 5, 6, 2});
-            if (!is_building_type(c + Coord{1, 0})) 
-                add_face({2, 6, 7, 3});
-            if (!is_building_type(c + Coord{0, -1})) 
-                add_face({3, 7, 4, 0});
+            const Point a = data.point_at(outline[i]);
+            const Point b = data.point_at(outline[i + 1]);
+            ifs.vertices.append_range(std::array<Point, 4>{{
+                {a.x, -30, a.z}, a, b, {b.x, -30, b.z}
+            }});
+            ifs.faces.append_range(std::array{base, base + 1, base + 2, base + 3, -1});
         }
     }
 }

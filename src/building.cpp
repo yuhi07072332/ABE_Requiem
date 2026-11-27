@@ -224,7 +224,7 @@ static void rdp(Building& building,
 /// @details
 /// 参考:
 /// https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm
-static void simplify_outlines(MapData& data, Building& building, std::uint32_t epsilon) {
+[[maybe_unused]] static void simplify_outlines(MapData& data, Building& building, std::uint32_t epsilon) {
     for (auto& outline_path : building.outline_paths) {
         if (outline_path.size() < 3) continue;
 
@@ -256,7 +256,9 @@ void process_buildings(MapData& data, std::uint32_t level) {
     std::println("輪郭平滑化...");
     for (auto& building : data.buildings) {
         const std::size_t before = building.coords.size();
-        simplify_outlines(data, building, level);
+        for (auto& o : building.outline_paths)
+            simplify_outline_old(building, o);
+        // simplify_outlines(data, building, level);
         const std::size_t after = building.coords.size();
         data.building_outline_coords -= before - after;
     }
