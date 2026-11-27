@@ -160,8 +160,7 @@ static void add_building_top(IndexedFaceSet& ifs,
 
     std::map<Coord, std::size_t> outline_indices;
     for (auto [i, c] : valid_coords | views::enumerate) {
-        if (data.type_at(c) != Type::BuildingOutline
-            || data.is_missing(c)) continue;
+        if (data.is_missing(c)) continue;
         outline_indices.try_emplace(c, i);
     }
 

@@ -32,7 +32,7 @@ void exec_all(MapData& data, const Option& opt) {
     smooth_ground(data, opt.smooth_ground_block, opt.smooth_ground_threshold);
 
     std::println("{}", "建物平滑化..." | hl);
-    smooth_buildings(data, opt.smooth_ground_block, opt.smooth_building_threshold);
+    smooth_buildings(data, opt.smooth_building_block, opt.smooth_building_threshold);
 
     const int ground_after = data.ground_coords;
     const int building_after = data.building_coords + data.building_outline_coords;
