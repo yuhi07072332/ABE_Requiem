@@ -110,6 +110,11 @@ Option parse_args(int argc, const char** argv) {
             }
         });
 
+    parser.add_argument("--minecraft")
+        .flag()
+        .store_into(opt.minecraft)
+        .help("建物のVRML化をMinecraftスタイルにする\x1b[1;31m(集合体恐怖症閲覧注意)\x1b[;m");
+
     parser.add_argument("--smooth-ground")
         .store_into(opt.smooth_ground_threshold)
         .metavar("<N>")

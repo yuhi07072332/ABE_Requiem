@@ -110,7 +110,8 @@ void all(const Option& opt) {
                 out_ground_filename,
                 out_building,
                 out_building_filename,
-                opt.colorful_buildings);
+                opt.colorful_buildings,
+                opt.minecraft);
 
     std::println("{} {}, {}, {}に出力しました",
                  "完了" | deco::fg(deco::bright_green) | deco::bold,

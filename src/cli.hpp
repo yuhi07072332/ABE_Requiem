@@ -15,6 +15,8 @@ struct Option {
     std::filesystem::path output_file;              // 出力ファイル
     bool append = false;                            // 出力する際にファイルを上書きするのではなく追加する
     
+    bool minecraft = false;
+    
     double smooth_ground_threshold = 0.1;
     int smooth_ground_block = 64;
     double smooth_building_threshold = 0.1;

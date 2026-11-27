@@ -10,6 +10,8 @@
 #include <ranges>
 #include <array>
 #include <format>
+#include <numeric>
+#include <queue>
 
 #include <third_party/CDT/CDT.hpp>
 
@@ -172,7 +174,7 @@ static void add_ground(IndexedFaceSet& ifs,
 }
 
 /// 制限付きドロネー三角形分割を使って建物の上面をIndexedFaceSetに追加
-static void add_building_top(IndexedFaceSet& ifs,
+[[maybe_unused]] static void add_building_top(IndexedFaceSet& ifs,
                              const MapData& data,
                              const Building& building) {
     auto valid_coords = building.coords
@@ -220,7 +222,7 @@ static void add_building_top(IndexedFaceSet& ifs,
 }
 
 /// 建物の壁をIndexedFaceSetに追加
-static void add_building_wall(IndexedFaceSet& ifs,
+[[maybe_unused]] static void add_building_wall(IndexedFaceSet& ifs,
                               const MapData& data,
                               const Building& building) {
     for (const auto& outline : building.outline_paths) {
@@ -232,6 +234,73 @@ static void add_building_wall(IndexedFaceSet& ifs,
                 {a.x, -30, a.z}, a, b, {b.x, -30, b.z}
             }});
             ifs.faces.append_range(std::array{base, base + 1, base + 2, base + 3, -1});
+        }
+    }
+}
+
+/// 1m四方の柱を並べ、外部に露出する面だけを追加する
+static void add_building_columns(IndexedFaceSet& ifs,
+                                 const MapData& data,
+                                 const Building& building) {
+    std::set<Coord> coords = building.coords;
+    for (const auto& path : building.outline_paths) {
+        for (std::size_t i = 0; i + 1 < path.size(); ++i) {
+            const Coord a = path[i];
+            const Coord delta = path[i + 1] - a;
+            const int steps = std::gcd(std::abs(delta.i), std::abs(delta.j));
+            for (int n = 1; n < steps; ++n) {
+                coords.insert({a.i + delta.i / steps * n,
+                               a.j + delta.j / steps * n});
+            }
+        }
+    }
+
+    constexpr std::array<Coord, 4> directions = {{{0, -1}, {1, 0},
+                                                   {0, 1}, {-1, 0}}};
+    std::map<Coord, double> heights;
+    std::queue<Coord> pending;
+    for (Coord c : coords) {
+        if (!data.is_missing(c)) {
+            heights.emplace(c, data.at(c));
+            pending.push(c);
+        }
+    }
+
+    // 平滑化で失われた高さを、同じ建物内の最も近い有効点から伝播する。
+    while (!pending.empty()) {
+        const Coord c = pending.front();
+        pending.pop();
+        for (Coord direction : directions) {
+            const Coord next = c + direction;
+            if (coords.contains(next) && heights.try_emplace(next, heights.at(c)).second)
+                pending.push(next);
+        }
+    }
+
+    constexpr double bottom = -30;
+    for (const auto& [c, height] : heights) {
+        const double x = data.get_x(c);
+        const double z = data.get_z(c);
+        const std::array<Point, 4> top = {{{x - 0.5, height, z - 0.5},
+                                           {x - 0.5, height, z + 0.5},
+                                           {x + 0.5, height, z + 0.5},
+                                           {x + 0.5, height, z - 0.5}}};
+        const auto base = static_cast<int64_t>(ifs.vertices.size());
+        ifs.vertices.append_range(top);
+        ifs.faces.append_range(std::array<int64_t, 5>{base, base + 1, base + 2, base + 3, -1});
+
+        for (std::size_t side = 0; side < directions.size(); ++side) {
+            const auto neighbor = heights.find(c + directions[side]);
+            const double lower = neighbor == heights.end() ? bottom : std::max(bottom, neighbor->second);
+            if (lower >= height) continue;
+            const std::size_t next = (side + 1) % top.size();
+            const auto wall = static_cast<int64_t>(ifs.vertices.size());
+            ifs.vertices.push_back({top[side].x, lower, top[side].z});
+            ifs.vertices.push_back({top[next].x, lower, top[next].z});
+            ifs.faces.append_range(std::array<int64_t, 5>{
+                base + static_cast<int64_t>(next), base + static_cast<int64_t>(side),
+                wall, wall + 1, -1
+            });
         }
     }
 }
@@ -275,7 +344,8 @@ void export_vrml(const MapData& data,
                 std::string_view out_ground_filename,
                 std::ostream& out_building,
                 std::string_view out_building_filename,
-                bool colorful_buildings) {
+                bool colorful_buildings,
+                bool minecraft) {
     auto building_color = [&](std::size_t index) -> std::string {
         constexpr double GOLDEN_ANGLE = 137.50776405003785;
 
@@ -350,15 +420,18 @@ Inline {{
         for (const auto& [i, building] 
             : data.buildings | std::views::enumerate) {
             IndexedFaceSet building_ifs = IndexedFaceSet(building_color(i));
-            add_building_wall(building_ifs, data, building);
-            add_building_top(building_ifs, data, building);
+            if (minecraft)
+                add_building_columns(building_ifs, data, building);
+            else {
+                add_building_top(building_ifs, data, building);
+                add_building_wall(building_ifs, data, building);
+            }
             building_ifs.write_to(out_building);
         }
     } else {
         IndexedFaceSet building_ifs = IndexedFaceSet("0.96 0.47 0.38");
         for (const auto& building : data.buildings) {
-            add_building_wall(building_ifs, data, building);
-            add_building_top(building_ifs, data, building);
+            add_building_columns(building_ifs, data, building);
         }
         building_ifs.write_to(out_building);
     }

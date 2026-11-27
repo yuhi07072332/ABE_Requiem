@@ -146,7 +146,8 @@ void export_vrml(const MapData& data,
                 std::string_view out_ground_filename,
                 std::ostream& out_building,
                 std::string_view out_building_filename,
-                bool colorful_buildings);
+                bool colorful_buildings,
+                bool minecraft);
 
 /* ----- input ----- */
 
