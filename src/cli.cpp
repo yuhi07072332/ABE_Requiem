@@ -126,7 +126,7 @@ Option parse_args(int argc, const char** argv) {
         .help("建物上面の平滑化の強度を指定[デフォルト=0.1]");
 
     parser.add_argument("--smooth-building-block")
-        .store_into(opt.smooth_ground_block)
+        .store_into(opt.smooth_building_block)
         .metavar("<N>")
         .help("建物上面の平滑化の最大ブロックサイズを指定[デフォルト=16]");
 
