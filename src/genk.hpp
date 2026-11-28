@@ -47,7 +47,7 @@ enum class Type : uint8_t {
     Other,
 };
 
-/// @brief 地図から読み込んだデータ
+/// @brief ファイルから読み込んだ地図データ
 ///
 /// @details
 /// * x座標を列、z座標を行とした行列でマップ内の点群を表す
@@ -115,15 +115,12 @@ std::ostream& operator<<(std::ostream&, Point);
 void show_mapdata_types(const MapData& data);
 void show_mapdata_heights(const MapData& data);
 void show_mapdata_buildings(const MapData& data);
+std::map<int, int> calc_frequency(const std::vector<double>& heights,
+                                  int width = 5);
 
 /* ----- building ----- */
 
 void process_buildings(MapData& data, std::uint32_t level);
-
-/* ----- algorithm ----- */
-
-std::map<int, int> calc_frequency(const std::vector<double>& heights,
-                                  int width = 5);
 
 /* ----- missing ----- */
 
