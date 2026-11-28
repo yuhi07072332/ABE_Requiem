@@ -1,4 +1,4 @@
-# python ./tools/launcher.py
+#!/usr/bin/env python3
 from pathlib import Path
 import subprocess
 import threading

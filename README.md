@@ -44,13 +44,42 @@ tools/      ← inspectorなどの`genk`が必要なツール
 ./genk --help
 ```
 
+## ツール
+
+### Inspector
+
+genkでのアルゴリズム実行結果を図式化するプログラム(genk内で起動)
+
+#### 使い方
+
+必要な依頼項をインストール: 
+
+```
+pip install -r tools/requirement.txt
+```
+
+起動:
+
+```
+./genk inspect <Args...>
+```
+
+### Launcher
+
+genkのGUIラッパー
+
+> [!NOTE]
+> tkinterがpython環境に必要です
+
+#### 使い方
+
+```
+./tools/launcher.py
+```
+
 ## 注意点
 
 - `src/`下の全ての`.cpp`ファイルは自動的にコンパイルの対象となるので、テストなどの用途で
 臨時的なcppファイルを作成したい場合は`src/`下に置かないでください
 
-## Inspector
 
-```
-pip install -r tools/requirement.txt
-```
